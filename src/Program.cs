@@ -834,6 +834,11 @@ namespace SBSimulator.src
                 WarnAndRefresh();
                 return;
             }
+            if (orderline[1] is not (STATUS or OPTIONS or LOG))
+            {
+                WarnAndRefresh($"表示する情報 {orderline[1]} が見つかりません。");
+                return;
+            }
             if (orderline[1] == STATUS)
             {
                 ShowStatus();
@@ -846,8 +851,6 @@ namespace SBSimulator.src
             {
                 ShowLog();
             }
-            else
-                Warn($"表示する情報 {orderline[1]} が見つかりません。");
         }
         static void OnResetOrdered(object sender, CancellationTokenSource cts)
         {
@@ -1025,10 +1028,16 @@ namespace SBSimulator.src
                             new ColoredString($"[単語名] [単語のタイプ指定]\n", ConsoleColor.Green).WriteLine();
                             new ColoredString($"(例): しっぺ JV     →   しっぺ(遊び / 暴力) で相手に攻撃する\n"
                                             + $"      もなりざ C　  →   もなりざ(芸術) で自分にバフをかける(とくせいが「ロックンロール」の場合)\n"
-                                            + $"      うぃすぱー H  →   うぃすぱー(医療) で自分の体力を回復する\n"
                                             + $"      いぺ Y        →   いぺ(植物) で相手にやどりぎを植え付ける (とくせいが「やどりぎ」の場合)\n", ConsoleColor.Cyan).WriteLine();
                             new ColoredString($"また、{INFER} オプションが有効な場合には、一部タイプ名の省略が可能です。\n", ConsoleColor.Yellow).WriteLine();
                             new ColoredString($"(例): るいざ   →    るいざ CK\n", ConsoleColor.Cyan).WriteLine();
+                            new ColoredString($"・ワイルドカード\n", ConsoleColor.Yellow).WriteLine();
+                            new ColoredString($"{ACTION} コマンド中の「単語名」パラメーター中に、アスタリスク記号 (\"", ConsoleColor.Yellow).Write();
+                            new ColoredString(" * ", ConsoleColor.Green).Write();
+                            new ColoredString($"\") を含めることで、\n{INFER} オプションや{STRICT} オプションによる制限を軽減することができます。\n", ConsoleColor.Yellow).WriteLine();
+                            new ColoredString("(例): あ*****ぞ D  →   「あ」で始まり「ぞ」で終わる、7文字の虫タイプの単語", ConsoleColor.Cyan).WriteLine();
+                            new ColoredString("　    お***** JG   →   「お」で始まり6文字の、遊び・地名複合タイプの単語", ConsoleColor.Cyan).WriteLine();
+                            new ColoredString("　    * F          →    任意の文字を受け付け、任意の文字に使用できる、1文字の食べ物タイプの単語\n", ConsoleColor.Cyan).WriteLine();
                             new ColoredString("...続けるには任意のキーを押してください...", ConsoleColor.White).WriteLine();
                             Console.ReadLine();
                             Console.Clear();
@@ -1175,8 +1184,8 @@ namespace SBSimulator.src
                             Console.ReadLine();
                             Console.Clear();
                             new ColoredString($"・{SET_MODE} オプション\n  複数のオプションをまとめて変更します。\n"
-                                            + "パラメーターにはモード名を指定できます。\n\n"
-                                            + "指定可能なモード名は以下の通りです。\n", ConsoleColor.Yellow).WriteLine();
+                                            + "  パラメーターにはモード名を指定できます。\n\n"
+                                            + "  指定可能なモード名は以下の通りです。\n", ConsoleColor.Yellow).WriteLine();
                             new ColoredString($"・{DEFAULT_MODE} モード\n\n  現環境のモード。\n  体力上限６０、とくせい変更３回、医療５回、やどりぎ４ターン。\n\n"
                                             + $"・{CLASSIC_MODE} モード\n\n  旧環境のモード。\n  体力上限５０、とくせい変更ナシ、医療・やどりぎ無限。\n\n"
                                             + $"・{AOS_MODE} モード\n\n  やどりぎ環境のモード。\n  体力上限６０、とくせい変更３回、医療５回、やどりぎ無限。\n", ConsoleColor.Yellow).WriteLine();
