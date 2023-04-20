@@ -44,15 +44,21 @@ show status       // プレイヤーのステータス（攻撃力の値など�
 ## Notice
 タイプ付き単語の情報は[atwiki](https://w.atwiki.jp/1855528/)の「行別タイプ付きワード一覧」記事群を参考にしています。
 
-wikiに記載のない頭文字の単語についてはタイプ推論機能をサポートしていませんので、ご了承ください。
+wikiに記載のない頭文字の単語についてはタイプ推論機能をサポートしていませんので、ご理解ください。
 
 ## Author
-<ul>
-  <li>作成者：ゟいたー</li>
-  <li>Twitter：<a href="https://twitter.com/lighter_depth">@lighter_depth</a></li>
-</ul>
+  - 作成者：ゟいたー
+  - Twitter：[@twitter_name](https://twitter.com/lighter_depth)
 
 ## License
 This software includes the work that is distributed in the [Apache License 2.0](https://www.apache.org/licenses/LICENSE-2.0).
 
 このソフトウェアは、 [Apache 2.0ライセンス](https://www.apache.org/licenses/LICENSE-2.0)で配布されている製作物が含まれています。
+
+SBSimulatorは、ささみ氏により作成されたブラウザゲーム「しりとりバトル」を参考に作成された、
+
+ファンメイドのコンソール アプリケーションです。
+
+本アプリケーションの二次配布・商用利用を固く禁止します。
+- ささみ氏のTwitter: [@twitter_name](https://twitter.com/sasamijp)
+- しりとりバトル(ブラウザ版): http://siritoribattle.net
