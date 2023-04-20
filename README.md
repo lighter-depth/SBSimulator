@@ -48,7 +48,7 @@ wikiに記載のない頭文字の単語についてはタイプ推論機能を�
 
 ## Author
   - 作成者：ゟいたー
-  - Twitter：[@twitter_name](https://twitter.com/lighter_depth)
+  - Twitter：https://twitter.com/lighter_depth
 
 ## License
 This software includes the work that is distributed in the [Apache License 2.0](https://www.apache.org/licenses/LICENSE-2.0).
@@ -60,5 +60,5 @@ SBSimulatorは、ささみ氏により作成されたブラウザゲーム「し
 ファンメイドのコンソール アプリケーションです。
 
 本アプリケーションの二次配布・商用利用を固く禁止します。
-- ささみ氏のTwitter: [@twitter_name](https://twitter.com/sasamijp)
+- ささみ氏のTwitter: https://twitter.com/sasamijp
 - しりとりバトル(ブラウザ版): http://siritoribattle.net
