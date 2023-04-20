@@ -1,0 +1,15 @@
+C:\Users\froml\source\repos\ConsoleApp7\ConsoleApp7\bin\Release\net7.0\SBSimulator.exe
+C:\Users\froml\source\repos\ConsoleApp7\ConsoleApp7\bin\Release\net7.0\SBSimulator.deps.json
+C:\Users\froml\source\repos\ConsoleApp7\ConsoleApp7\bin\Release\net7.0\SBSimulator.runtimeconfig.json
+C:\Users\froml\source\repos\ConsoleApp7\ConsoleApp7\bin\Release\net7.0\SBSimulator.dll
+C:\Users\froml\source\repos\ConsoleApp7\ConsoleApp7\obj\Release\net7.0\SBSimulator.csproj.AssemblyReference.cache
+C:\Users\froml\source\repos\ConsoleApp7\ConsoleApp7\obj\Release\net7.0\SBSimulator.GeneratedMSBuildEditorConfig.editorconfig
+C:\Users\froml\source\repos\ConsoleApp7\ConsoleApp7\obj\Release\net7.0\SBSimulator.AssemblyInfoInputs.cache
+C:\Users\froml\source\repos\ConsoleApp7\ConsoleApp7\obj\Release\net7.0\SBSimulator.AssemblyInfo.cs
+C:\Users\froml\source\repos\ConsoleApp7\ConsoleApp7\obj\Release\net7.0\SBSimulator.csproj.CoreCompileInputs.cache
+C:\Users\froml\source\repos\ConsoleApp7\ConsoleApp7\obj\Release\net7.0\SBSimulator.dll
+C:\Users\froml\source\repos\ConsoleApp7\ConsoleApp7\obj\Release\net7.0\refint\SBSimulator.dll
+C:\Users\froml\source\repos\ConsoleApp7\ConsoleApp7\obj\Release\net7.0\SBSimulator.genruntimeconfig.cache
+C:\Users\froml\source\repos\ConsoleApp7\ConsoleApp7\obj\Release\net7.0\ref\SBSimulator.dll
+C:\Users\froml\source\repos\ConsoleApp7\ConsoleApp7\bin\Release\net7.0\Umayadia.Kana.dll
+C:\Users\froml\source\repos\ConsoleApp7\ConsoleApp7\obj\Release\net7.0\SBSimulator.csproj.CopyComplete

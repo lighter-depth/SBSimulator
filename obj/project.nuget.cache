@@ -1,0 +1,10 @@
+{
+  "version": 2,
+  "dgSpecHash": "NN/jU7eyJU1RIHWdfOKZR22m+8tCEg4SLrm9AO9Rc6+uyoSsGQ67Bpudci8+067GYGNBjeAvAhQRnrNIeCGKng==",
+  "success": true,
+  "projectFilePath": "C:\\Users\\froml\\Desktop\\ConsoleApp7\\SBSimulator\\SBSimulator.csproj",
+  "expectedPackageFiles": [
+    "C:\\Users\\froml\\.nuget\\packages\\kana.net\\1.0.6\\kana.net.1.0.6.nupkg.sha512"
+  ],
+  "logs": []
+}

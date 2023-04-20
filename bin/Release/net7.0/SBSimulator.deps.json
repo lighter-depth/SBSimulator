@@ -1,0 +1,41 @@
+{
+  "runtimeTarget": {
+    "name": ".NETCoreApp,Version=v7.0",
+    "signature": ""
+  },
+  "compilationOptions": {},
+  "targets": {
+    ".NETCoreApp,Version=v7.0": {
+      "SBSimulator/1.0.0": {
+        "dependencies": {
+          "Kana.NET": "1.0.6"
+        },
+        "runtime": {
+          "SBSimulator.dll": {}
+        }
+      },
+      "Kana.NET/1.0.6": {
+        "runtime": {
+          "lib/net6.0/Umayadia.Kana.dll": {
+            "assemblyVersion": "1.0.6.0",
+            "fileVersion": "1.0.6.0"
+          }
+        }
+      }
+    }
+  },
+  "libraries": {
+    "SBSimulator/1.0.0": {
+      "type": "project",
+      "serviceable": false,
+      "sha512": ""
+    },
+    "Kana.NET/1.0.6": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "sha512-xc9teFuWQJ1h0YddJZxVWNTfvNPK648Wed4k8JYViNZN3txcV/5RXW/13nZsKjY/qndFSzJEta7mVr4jsVyXgg==",
+      "path": "kana.net/1.0.6",
+      "hashPath": "kana.net.1.0.6.nupkg.sha512"
+    }
+  }
+}

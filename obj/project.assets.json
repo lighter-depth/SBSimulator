@@ -1,0 +1,102 @@
+{
+  "version": 3,
+  "targets": {
+    "net7.0": {
+      "Kana.NET/1.0.6": {
+        "type": "package",
+        "compile": {
+          "lib/net6.0/Umayadia.Kana.dll": {}
+        },
+        "runtime": {
+          "lib/net6.0/Umayadia.Kana.dll": {}
+        }
+      }
+    }
+  },
+  "libraries": {
+    "Kana.NET/1.0.6": {
+      "sha512": "xc9teFuWQJ1h0YddJZxVWNTfvNPK648Wed4k8JYViNZN3txcV/5RXW/13nZsKjY/qndFSzJEta7mVr4jsVyXgg==",
+      "type": "package",
+      "path": "kana.net/1.0.6",
+      "files": [
+        ".nupkg.metadata",
+        ".signature.p7s",
+        "kana.net.1.0.6.nupkg.sha512",
+        "kana.net.nuspec",
+        "lib/net5.0/Umayadia.Kana.dll",
+        "lib/net6.0/Umayadia.Kana.dll",
+        "lib/netcoreapp3.1/Umayadia.Kana.dll",
+        "umayadia128.png"
+      ]
+    }
+  },
+  "projectFileDependencyGroups": {
+    "net7.0": [
+      "Kana.NET >= 1.0.6"
+    ]
+  },
+  "packageFolders": {
+    "C:\\Users\\froml\\.nuget\\packages\\": {}
+  },
+  "project": {
+    "version": "1.0.0",
+    "restore": {
+      "projectUniqueName": "C:\\Users\\froml\\Desktop\\ConsoleApp7\\SBSimulator\\SBSimulator.csproj",
+      "projectName": "SBSimulator",
+      "projectPath": "C:\\Users\\froml\\Desktop\\ConsoleApp7\\SBSimulator\\SBSimulator.csproj",
+      "packagesPath": "C:\\Users\\froml\\.nuget\\packages\\",
+      "outputPath": "C:\\Users\\froml\\Desktop\\ConsoleApp7\\SBSimulator\\obj\\",
+      "projectStyle": "PackageReference",
+      "configFilePaths": [
+        "C:\\Users\\froml\\AppData\\Roaming\\NuGet\\NuGet.Config",
+        "C:\\Program Files (x86)\\NuGet\\Config\\Microsoft.VisualStudio.Offline.config"
+      ],
+      "originalTargetFrameworks": [
+        "net7.0"
+      ],
+      "sources": {
+        "C:\\Program Files (x86)\\Microsoft SDKs\\NuGetPackages\\": {},
+        "https://api.nuget.org/v3/index.json": {}
+      },
+      "frameworks": {
+        "net7.0": {
+          "targetAlias": "net7.0",
+          "projectReferences": {}
+        }
+      },
+      "warningProperties": {
+        "warnAsError": [
+          "NU1605"
+        ]
+      }
+    },
+    "frameworks": {
+      "net7.0": {
+        "targetAlias": "net7.0",
+        "dependencies": {
+          "Kana.NET": {
+            "target": "Package",
+            "version": "[1.0.6, )"
+          }
+        },
+        "imports": [
+          "net461",
+          "net462",
+          "net47",
+          "net471",
+          "net472",
+          "net48",
+          "net481"
+        ],
+        "assetTargetFallback": true,
+        "warn": true,
+        "frameworkReferences": {
+          "Microsoft.NETCore.App": {
+            "privateAssets": "all"
+          }
+        },
+        "runtimeIdentifierGraphPath": "C:\\Program Files\\dotnet\\sdk\\7.0.100\\RuntimeIdentifierGraph.json"
+      }
+    }
+  }
+}
