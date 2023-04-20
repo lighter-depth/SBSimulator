@@ -1,6 +1,15 @@
 SBSimulator
 ====
 SBSimulator, the one and the only simulator for SB.
+## Overview
+SBSimulatorは、SBのダメージ計算や環境の構築、戦法のテストなどを目的として開発されたコンソール アプリケーションです。
+
+通常のしりとり機能に加え、以下の機能を揃えています。
+- SB準拠のシステム
+- ワイルドカード機能
+- タイプ指定機能
+- パラメーター（急所倍率、医療回数制限など）の設定
+- タイプ推論（一部頭文字のみ）
 
 ## Install
 [Releases](https://github.com/lighter-depth/SBSimulator/releases)にアクセスし、最新版のSource Codeファイル(zip形式)をダウンロードしてください。
