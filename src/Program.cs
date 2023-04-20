@@ -9,11 +9,67 @@ using System.Text.RegularExpressions;
 using Umayadia.Kana;
 using SBSimulator.src;
 
+
+/*
+ *   ◆辞書について
+ *   
+ * 　辞書は全部で３種類。すべて dic ディレクトリ下に設置する。
+ * 　無属性単語を扱った辞書は no type ディレクトリ直下に、
+ * 　有属性単語を扱った辞書は typed ディレクトリ下に設置する。
+ * 　
+ * 　・no-type-words.csv
+ * 　無属性の単語を扱った辞書。SBの辞書と比べて抜けが多い。（くれもんてぃーぬ　など）
+ * 　保存形式は一行一単語。（単語A \n 単語B \n 単語C \n ...）
+ * 　原則改変しない。
+ * 　
+ * 　・no-type-word-extension.csv
+ * 　無属性の単語を扱った辞書。no-type-words.csv でカバーしきれない単語を補うため、
+ * 　補助的に用いる。
+ * 　原則、「ゲーム内には存在するが、no-type-words.csv には含まれていない単語」が含まれる。
+ * 　ただし、タイプ付きの単語については後述の有属性辞書を用い、
+ * 　この辞書には含めない。
+ * 　
+ * 　・有属性辞書
+ * 　ファイル名は「typed-words-(単語の頭文字).csv」としている。
+ * 　それぞれ対応した行を表すサブディレクトリ下に配置する。
+ * 　no-tyoe-words.csv に含まれない単語のうち、タイプ付きの単語については
+ * 　この辞書に含めている。
+ * 　改変はSBwikiに従って行う。
+ * 　
+ * 　◆デバッグ用コマンドについて
+ * 　
+ * 　以下の３つのコマンドはデバッグ用であり、通常利用時は用いない。
+ * 　
+ * 　・add コマンド
+ * 　拡張無属性辞書(no-tyoe-word-extension.csv)に単語を追加する際に使用する。
+ * 　入力はひらがなのみ可能。
+ * 　ひらがな以外で入力を行った場合や、任意の辞書内に既に単語が存在している場合には警告となる。
+ * 　入力例: 　__add くれもんてぃーぬ
+ * 　    → 無属性の単語「くれもんてぃーぬ」を拡張無属性辞書に追加する。
+ * 　    
+ * 　・remove コマンド
+ * 　拡張無属性辞書から単語を削除する際に使用する。
+ * 　拡張無属性辞書内に該当する単語が存在しない場合には警告となる。
+ * 　入力例:   __remove くれもんてぃーぬ
+ * 　　　→ 無属性の単語「くれもんてぃーぬ」を拡張無属性辞書から削除する。
+ * 　
+ * 　・error コマンド
+ * 　例外を発生させ、アプリケーションを停止させる。
+ * 　入力:    __error
+ */
+
+// TODO: 辞書ディレクトリ探索の改善
+// TODO: ユーザー定義の無属性・有属性辞書の作成
+// TODO: オミット辞書の作成
+// TODO: ワードサーチ機能の実装
+// TODO: 辞書パース機能の実装
+// TODO: とくせい適用の柔軟化（埋め込みを避ける）
 namespace SBSimulator.src
 {
     class Program
     {
         #region static fields
+        static readonly string Version = "v0.1.0";
         static ConsoleEventLoop eventLoop = new();
         static readonly Window w = new();
         static Player p1 = new();
@@ -41,6 +97,7 @@ namespace SBSimulator.src
             [HELP] = OnHelpOrdered,
             [ADD] = OnAddOrdered,
             [REMOVE] = OnRemoveOrdered,
+            [ERROR] = OnErrorOrdered
         };
         #endregion
 
@@ -56,6 +113,7 @@ namespace SBSimulator.src
         const string HELP = "help";
         const string ADD = "__add";
         const string REMOVE = "__remove";
+        const string ERROR = "__error";
         const string WARNING = "入力が不正です。";
         const string SET_MAX_HP = "SetMaxHP";
         const string INFINITE_SEED = "InfiniteSeed";
@@ -74,6 +132,7 @@ namespace SBSimulator.src
         const string STATUS = "status";
         const string OPTIONS = "options";
         const string LOG = "log";
+        const string INFO = "info";
         internal const string DEFAULT_MODE = "Default";
         internal const string CLASSIC_MODE = "Classic";
         internal const string AOS_MODE = "AgeOfSeed";
@@ -834,7 +893,7 @@ namespace SBSimulator.src
                 WarnAndRefresh();
                 return;
             }
-            if (orderline[1] is not (STATUS or OPTIONS or LOG))
+            if (orderline[1] is not (STATUS or OPTIONS or LOG or INFO))
             {
                 WarnAndRefresh($"表示する情報 {orderline[1]} が見つかりません。");
                 return;
@@ -850,6 +909,10 @@ namespace SBSimulator.src
             else if (orderline[1] == LOG)
             {
                 ShowLog();
+            }
+            else if (orderline[1] == INFO)
+            {
+                ShowInfo();
             }
         }
         static void OnResetOrdered(object sender, CancellationTokenSource cts)
@@ -1069,10 +1132,11 @@ namespace SBSimulator.src
                             Console.Clear();
                             new ColoredString($"・{HELP} コマンド\n\n  ヘルプを表示します。\n", ConsoleColor.Yellow).WriteLine();
                             new ColoredString($"(例): {HELP}\n", ConsoleColor.Cyan).WriteLine();
-                            new ColoredString($"・{SHOW} コマンド\n\n  様々な情報を表示します。\n\n  パラメーターには\"{STATUS}\", \"{OPTIONS}\", \"{LOG}\" のいずれかを用いることができます。", ConsoleColor.Yellow).WriteLine();
+                            new ColoredString($"・{SHOW} コマンド\n\n  様々な情報を表示します。\n\n  パラメーターには\"{STATUS}\", \"{OPTIONS}\", \"{LOG}\", \"{INFO}\" のいずれかを用いることができます。", ConsoleColor.Yellow).WriteLine();
                             new ColoredString($"(例): {SHOW} {STATUS}    →   プレイヤーの情報を表示する。\n"
                                             + $"      {SHOW} {OPTIONS}   →   オプションの状態を表示する。\n"
-                                            + $"      {SHOW} {LOG}       →   ログを表示する。\n\n", ConsoleColor.Cyan).WriteLine();
+                                            + $"      {SHOW} {LOG}       →   ログを表示する。\n"
+                                            + $"      {SHOW} {INFO}      →   アプリの情報を表示する。\n", ConsoleColor.Cyan).WriteLine();
                             new ColoredString("...続けるには任意のキーを押してください...", ConsoleColor.White).WriteLine();
                             Console.ReadLine();
 
@@ -1246,6 +1310,25 @@ namespace SBSimulator.src
             Refresh();
             w.WriteLine();
         }
+        static void ShowInfo()
+        {
+            IsSuspended = true;
+            Console.Clear();
+            new ColoredString("情報\n\n"
+                            + $"・現在のバージョン: {Version}\n\n"
+                            + "・制作: らいたー　（Twitterアカウント: https://twitter.com/lighter_depth）\n\n"
+                            + "不具合が発生した場合には、上記のTwitterアカウントにご連絡ください。\n\n\n\n"
+                            + "SBSimulatorは、ブラウザゲーム「しりとりバトル」を参考に作成した、ファンメイドのアプリケーションです。\n\n"
+                            + "二次配布・商用利用を固く禁止します。\n\n", ConsoleColor.Yellow).WriteLine();
+            new ColoredString("・ゲーム「しりとりバトル」のURL: http://siritori-battle.net/\n\n"
+                            + "・「しりとりバトル」の制作者、ささみJP氏のTwitterアカウント: https://twitter.com/sasamijp\n\n\n", ConsoleColor.DarkYellow).WriteLine();
+            new ColoredString("終了するには、任意のキーを押してください. . . ", ConsoleColor.White).WriteLine();
+            Console.ReadLine();
+            Console.Clear();
+            IsSuspended = false;
+            Refresh();
+            w.WriteLine();
+        }
         static void ShowLog()
         {
             IsSuspended = true;
@@ -1357,7 +1440,7 @@ namespace SBSimulator.src
                 WarnAndRefresh();
                 return;
             }
-            if (NoTypeWords.Contains(orderline[1]) || NoTypeWordEx.Contains(orderline[1]))
+            if (NoTypeWords.Contains(orderline[1]) || NoTypeWordEx.Contains(orderline[1]) || TypedWords.ContainsKey(orderline[1]))
             {
                 WarnAndRefresh($"単語「{orderline[1]}」は既に辞書に含まれています。");
                 return;
@@ -1398,6 +1481,10 @@ namespace SBSimulator.src
         }
         static void OnSearchOrdered(object sender, CancellationTokenSource cts)
         {
+        }
+        static void OnErrorOrdered(object sender, CancellationTokenSource cts)
+        {
+            Error();
         }
         static void Error()
         {
