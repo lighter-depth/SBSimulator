@@ -12,7 +12,7 @@ SBSimulatorは、SBのダメージ計算や環境の構築、戦法のテスト�
 - タイプ推論（一部頭文字のみ）
 
 ## Install
-[Releases](https://github.com/lighter-depth/SBSimulator/releases)にアクセスし、最新版のSource codeファイル(zip形式)をダウンロードしてください。
+[Releases](https://github.com/lighter-depth/SBSimulator/releases)にアクセスし、最新版のアプリケーションファイル(zip形式)をダウンロードしてください。
 
 実行ファイルは/bin/Release/net7.0 直下にあります。
 
