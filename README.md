@@ -33,7 +33,7 @@ command_parameters
 ```
 #### コマンドのサンプル
 ```antlr
-change PlayerA RockRoll  // 名前が「PlayerA」であるプレイヤーを探し、とくせいをロックンロールに変更する
+change PlayerA RocknRoll  // 名前が「PlayerA」であるプレイヤーを探し、とくせいをロックンロールに変更する
 ```
 ```antlr
 option SetMaxSeedTurn 6  // やどりぎの継続ターンを６ターンに設定する
