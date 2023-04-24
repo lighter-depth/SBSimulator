@@ -81,7 +81,7 @@ namespace SBSimulator.src
                 _ => "天で話にならねぇよ..."
             };
         }
-        public static string AbilToString(this Player.PlayerAbility abil)
+        public static string AbilToString(this PlayerAbility abil)
         {
             return abil switch
             {
@@ -257,6 +257,16 @@ namespace SBSimulator.src
                 list.Add(content);
             }
             return list;
+        }
+        public static void WriteLine(this (string, ConsoleColor) cString)
+        {
+            var (text, color) = cString;
+            new ColoredString(text, color).WriteLine();
+        }
+        public static void Write(this (string, ConsoleColor) cString)
+        {
+            var (text, color) = cString;
+            new ColoredString(text, color).Write();
         }
         #endregion
     }
