@@ -62,7 +62,7 @@ namespace SBSimulator.Source;
 class Program
 {
     #region static fields
-    static readonly string Version = "v0.2.1";
+    static readonly string Version = "v0.3.0";
     static ConsoleEventLoop eventLoop = new();
     static readonly Window w = new();
     static Player p1 = new();
