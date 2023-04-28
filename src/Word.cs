@@ -1,54 +1,22 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-using static SBSimulator.src.Player;
-using static SBSimulator.src.Word.WordType;
+﻿using static SBSimulator.Source.Player;
+using static SBSimulator.Source.Word.WordType;
 
-namespace SBSimulator.src
+namespace SBSimulator.Source
 {
     internal class Word
     {
         #region properties
-        public string Name { get; init; } = "\0";
+        public string Name { get; init; } = string.Empty;
         public WordType Type1 { get; init; } = Empty;
         public WordType Type2 { get; init; } = Empty;
         public Player? User { get; init; }
+        public Player? Receiver { get; init; }
         public int Length => Name.Length;
         public bool IsHeal => ContainsType(Food) || ContainsType(Health);
-        public bool IsPoison => !IsHeal && ContainsType(Bug) && User?.Ability == PlayerAbility.Dokubari;
-        public bool IsSeed => !IsHeal && ContainsType(Plant) && User?.Ability == PlayerAbility.Yadorigi;
-        public bool IsRev => !IsHeal && ContainsType(Play) && User?.Ability == PlayerAbility.Kakumei;
-        public bool IsWZ => !IsHeal && ContainsType(Weather) && User?.Ability == PlayerAbility.WZ;
-        public bool IsBuf => !IsHeal && User?.Ability switch
-        {
-            PlayerAbility.Jounetsu => ContainsType(Emote),
-            PlayerAbility.RocknRoll => ContainsType(Art),
-            PlayerAbility.Kachikochi => ContainsType(Mech),
-            PlayerAbility.Sakinobashi => ContainsType(Time),
-            PlayerAbility.Busou => ContainsType(Work),
-            PlayerAbility.Kasanegi => ContainsType(Cloth),
-            PlayerAbility.Keisan => ContainsType(WordType.Math),
-            PlayerAbility.Training => ContainsType(Sports),
-            _ => false
-        };
-        public bool IsATKBuf => !IsHeal && User?.Ability switch
-        {
-            PlayerAbility.Jounetsu => ContainsType(Emote),
-            PlayerAbility.RocknRoll => ContainsType(Art),
-            PlayerAbility.Busou => ContainsType(Work),
-            PlayerAbility.Keisan => ContainsType(WordType.Math),
-            PlayerAbility.Training => ContainsType(Sports),
-            _ => false
-        };
-        public bool IsDEFBuf => !IsHeal && User?.Ability switch
-        {
-            PlayerAbility.Kachikochi => ContainsType(Mech),
-            PlayerAbility.Sakinobashi => ContainsType(Time),
-            PlayerAbility.Kasanegi => ContainsType(Cloth),
-            _ => false
-        };
+        public bool IsCritable => ContainsType(Body) || ContainsType(Insult);
+        public bool IsSeed => !IsHeal && User?.Ability is ISeedable isd && ContainsType(isd.SeedType) && Receiver?.State.HasFlag(PlayerState.Seed) is false;
+        public bool IsBuf => !IsHeal && User?.Ability is ISingleTypedBufAbility it && ContainsType(it.BufType);
+        public bool IsViolence => !IsHeal && ContainsType(Violence);
         #endregion
 
         #region private fields
@@ -63,10 +31,11 @@ namespace SBSimulator.src
             Type1 = type1;
             Type2 = type2;
         }
-        public Word(string name, Player user, WordType type1, WordType type2 = Empty)
+        public Word(string name, Player user, Player receiver, WordType type1, WordType type2 = Empty)
         {
             Name = name;
             User = user;
+            Receiver = receiver;
             Type1 = type1;
             Type2 = type2;
         }
@@ -144,18 +113,17 @@ namespace SBSimulator.src
         }
         public int IsSuitable(Word prev)
         {
-            if (string.IsNullOrEmpty(prev.Name))
+            if (string.IsNullOrWhiteSpace(prev.Name))
                 return 0;
             if (Name[0].IsWild() || prev.Name[^1].IsWild())
                 return 0;
             if (!prev.Name[^1].WordlyEquals(Name[0]))
             {
-                if (prev.Name.Length > 1 && prev.Name[^1] == 'ー' && prev.Name[^2].WordlyEquals(Name[0]))
-                {
+                if (prev.Name.Length > 1 && prev.Name[^1] == 'ー' && prev.Name[^2].WordlyEquals(Name[0])
+                 || prev.Name.Length > 1 && prev.Name[^1] == 'ー' && prev.Name[^2].IsWild())
                     return 0;
-                }
-                if (prev.Name.Length > 1 && prev.Name[^1] == 'ー' && prev.Name[^2].IsWild())
-                    return 1;
+                return 1;
+
             }
             if (Name[^1] == 'ん')
             {
