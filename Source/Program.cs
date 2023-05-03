@@ -1,4 +1,6 @@
-﻿using System.Text;
+﻿#define BATTLE_TEST
+#undef BATTLE_TEST
+using System.Text;
 using static SBSimulator.Source.Word;
 using static SBSimulator.Source.SBOptions;
 using static System.ConsoleColor;
@@ -22,6 +24,7 @@ using Umayadia.Kana;
  * 　原則、「ゲーム内には存在するが、no-type-words.csv には含まれていない単語」が含まれる。
  * 　ただし、タイプ付きの単語については後述の有属性辞書を用い、
  * 　この辞書には含めない。
+ * 　保存形式は no-type-words.csv と同じ。
  * 　
  * 　・有属性辞書
  * 　ファイル名は「typed-words-(単語の頭文字).csv」としている。
@@ -29,6 +32,8 @@ using Umayadia.Kana;
  * 　no-tyoe-words.csv に含まれない単語のうち、タイプ付きの単語については
  * 　この辞書に含めている。
  * 　改変はSBwikiに従って行う。
+ * 　また、aux-typed-words ディレクトリ下に補助用のタイプ付き単語リストを保存している。
+ * 　いずれも保存形式は一行一単語。(単語A タイプ１ タイプ２ \n 単語B タイプ１ タイプ２ \n ...)
  */
 
 /* 　◆デバッグ用コマンドについて
@@ -56,38 +61,38 @@ using Umayadia.Kana;
 // TODO: オミット辞書の作成
 // TODO: 辞書パース機能の実装
 // TODO: 起動直後のパフォーマンス改善
-
+// TODO: Battle クラスの作成（ターン制御の抽象化）
+// TODO: 状態異常の埋め込み解消（PlayerState クラス作成）
 namespace SBSimulator.Source;
 
 class Program
 {
     #region static fields
-    static readonly string Version = "v0.3.0";
-    static ConsoleEventLoop eventLoop = new();
-    static readonly Window w = new();
-    static Player p1 = new();
-    static Player p2 = new();
-    static Player PreActor { get; set; } = new();
-    static Player PreReceiver { get; set; } = new();
-    static bool IsP1sTurn { get; set; } = true;
-    static bool IsSuspended { get; set; } = false;
-    static Player CurrentP => IsP1sTurn ? p1 : p2;
-    static Player OtherP => IsP1sTurn ? p2 : p1;
-    public static List<string> UsedWords = new();
-    static List<string> NoTypeWords = new();
+    static readonly string Version = "v0.4.1";
+    static readonly Window window = new();
+    static Battle battle = new();
     static readonly string DicDir = GetDicPath();
     static readonly string NoTypeWordsPath = DicDir + @"\no type\no-type-words.csv";
     static readonly string NoTypeWordExPath = DicDir + @"\no type\no-type-word-extension.csv";
     static readonly string TypedWordsPath = DicDir + @"\typed";
-    static List<string> NoTypeWordEx = new();
-    static Dictionary<string, List<WordType>> TypedWords = new();
-    static Task DictionaryImportTask;
-    static Dictionary<string, Action<object, CancellationTokenSource>> OrderFunctions => new()
+    /// <summary>
+    /// タイプ無し単語の情報
+    /// </summary>
+    public static List<string> NoTypeWords { get; private set; } = new();
+    /// <summary>
+    /// 拡張タイプ無し単語の情報
+    /// </summary>
+    public static List<string> NoTypeWordEx { get; private set; } = new();
+    /// <summary>
+    /// タイプ付き単語の情報
+    /// </summary>
+    public static Dictionary<string, List<WordType>> TypedWords { get; private set; } = new();
+    static readonly Task DictionaryImportTask;
+    /// <summary>
+    /// <see cref="Battle"/>クラスのインスタンスに追加で渡すハンドラーの情報
+    /// </summary>
+    static Dictionary<string, Action<string[], CancellationTokenSource>> CustomFunctions => new()
     {
-        [CHANGE] = OnChangeOrdered,
-        ["ch"] = OnChangeOrdered,
-        [OPTION] = OnOptionOrdered,
-        ["op"] = OnOptionOrdered,
         [SHOW] = OnShowOrdered,
         ["sh"] = OnShowOrdered,
         [RESET] = OnResetOrdered,
@@ -129,8 +134,8 @@ class Program
     const string SET_CRIT_DMG_MULTIPLIER = "SetCritDmgMultiplier";
     const string SET_INS_BUF_QTY = "SetInsBufQty";
     const string SET_MODE = "SetMode";
-    const string Player1 = "Player1";
-    const string Player2 = "Player2";
+    const string PLAYER1 = "Player1";
+    const string PLAYER2 = "Player2";
     const string STATUS = "status";
     const string OPTIONS = "options";
     const string LOG = "log";
@@ -145,24 +150,20 @@ class Program
     #region methods
     static Program()
     {
-        DictionaryImportTask = Task.Run(ImportDictionary);
+        DictionaryImportTask = Task.Run(ImportDictionaryAsync);
     }
     static void Main()
     {
         try
         {
-            IsSuspended = false;
-            SetMode(SBMode.Default);
-            SetUp();
+            var (p1, p2) = SetUp();
             Console.WriteLine("辞書を読み込み中...\n\nしばらくお待ちください...");
-            while (!DictionaryImportTask.IsCompleted) { }
-            Refresh();
-            w.Message.Append($"{CurrentP.Name} のターンです", Yellow);
-            w.Message.Log.Append($"{p1.Name}: {p1.HP}/{p1.MaxHP},     {p2.Name}: {p2.HP}/{p2.MaxHP}", DarkYellow);
-            w.WriteLine();
-            var cts = new CancellationTokenSource();
-            eventLoop = new ConsoleEventLoop(order => OnOrdered(order, cts));
-            Task.Run(() => eventLoop.Start(cts.Token)).Wait();
+            DictionaryImportTask.Wait();
+            battle = new Battle(p1, p2);
+            battle.OnReset += Reset;
+            battle.In = () => Console.ReadLine()?.Trim().Split() ?? Array.Empty<string>();
+            battle.Out = Output;
+            battle.Run(CustomFunctions);
             ExitApp();
         }
         catch (Exception exc)
@@ -175,371 +176,8 @@ class Program
             Console.WriteLine("\n\n\n\n任意のキーを押してアプリケーションを終了します. . . ");
             Console.ReadLine();
         }
-
     }
     #region handlers
-    static void OnOrdered(string order, CancellationTokenSource cts)
-    {
-        var orderline = order.Trim().Split();
-        if (orderline.Length == 0 || string.IsNullOrWhiteSpace(orderline[0]))
-        {
-            Refresh();
-            w.WriteLine();
-            return;
-        }
-        if (OrderFunctions.TryGetValue(orderline[0].ToLower(), out var func))
-        {
-            func(orderline, cts);
-            Refresh();
-            w.WriteLine();
-            return;
-        }
-        OnDefault(orderline, cts);
-        Refresh();
-        w.WriteLine();
-    }
-    static void OnChangeOrdered(object sender, CancellationTokenSource cts)
-    {
-        var orderline = (string[])sender;
-        if (!IsAbilChangeable)
-        {
-            Warn("設定「変更可能な特性」がオフになっています。option コマンドから設定を切り替えてください。");
-            return;
-        }
-        if (orderline.Length == 2)      // change 俺文字
-        {
-            var nextAbil = AbilityFactory.Create(orderline[1]);
-            if (nextAbil is null)
-            {
-                Warn($"入力 {orderline[1]} に対応するとくせいが見つかりませんでした。");
-                return;
-            }
-            if (nextAbil == CurrentP.Ability)
-            {
-                Warn($"既にそのとくせいになっている！");
-                return;
-            }
-            if (CurrentP.TryChangeAbil(nextAbil))
-                w.Message.Append($"{CurrentP.Name} はとくせいを {nextAbil.ToString()} に変更しました", Cyan);
-            else
-                w.Message.Append($"{CurrentP.Name} はもう特性を変えられない！", Yellow);
-        }
-        else if (orderline.Length == 3)    // change じぶん 俺文字
-        {
-            Player abilChangingP = new();
-            bool player1Flag = orderline[1] == p1.Name || orderline[1] == Player1 || orderline[1] == "p1";
-            bool player2Flag = orderline[1] == p2.Name || orderline[1] == Player2 || orderline[1] == "p2";
-            if (!player1Flag && !player2Flag)
-            {
-                Warn($"名前 {orderline[1]} を持つプレイヤーが見つかりませんでした。");
-                return;
-            }
-            if (player1Flag)
-                abilChangingP = p1;
-            else if (player2Flag)
-                abilChangingP = p2;
-            var nextAbil = AbilityFactory.Create(orderline[2]);
-            if (nextAbil is null)
-            {
-                Warn($"入力 {orderline[2]} に対応するとくせいが見つかりませんでした。");
-                return;
-            }
-            if (nextAbil == abilChangingP.Ability)
-            {
-                Warn($"既にそのとくせいになっている！");
-                return;
-            }
-            if (abilChangingP.TryChangeAbil(nextAbil))
-                w.Message.Append($"{abilChangingP.Name} はとくせいを {nextAbil.ToString()} に変更しました", Cyan);
-            else
-                w.Message.Append($"{abilChangingP.Name} はもう特性を変えられない！", Yellow);
-        }
-        else
-            Warn();
-    }
-    static void OnOptionOrdered(object sender, CancellationTokenSource cts)
-    {
-        var order = (string[])sender;
-        if (order.Length < 2)
-        {
-            Warn();
-            return;
-        }
-        Action<string[]> option = order[1] switch
-        {
-            SET_MAX_HP or "SMH" or "smh" => OptionSetMaxHP,
-            INFINITE_SEED or "IS" or "is" => OptionInfiniteSeed,
-            INFINITE_CURE or "IC" or "ic" => OptionInfiniteCure,
-            ABIL_CHANGE or "AC" or "ac" => OptionAbilChange,
-            STRICT or "S" or "s" => OptionStrict,
-            INFER or "I" or "i" => OptionInfer,
-            SET_ABIL_COUNT or "SAC" or "sac" => OptionSetAbilCount,
-            SET_MAX_CURE_COUNT or "SMCC" or "smcc" or "SMC" or "smc" => OptionSetMaxCureCount,
-            SET_MAX_FOOD_COUNT or "SMFC" or "smfc" or "SMF" or "smf" => OptionSetMaxFoodCount,
-            SET_SEED_DMG or "SSD" or "ssd" => OptionSetSeedDmg,
-            SET_MAX_SEED_TURN or "SMST" or "smst" or "SMS" or "sms" => OptionSetMaxSeedTurn,
-            SET_CRIT_DMG_MULTIPLIER or "SCDM" or "scdm" or "SCD" or "scd" => OptionSetCritDmgMultiplier,
-            SET_INS_BUF_QTY or "SIBQ" or "sibq" or "SIB" or "sib" => OptionSetInsBufQty,
-            SET_MODE or "SM" or "sm" => OptionSetMode,
-            _ => OptionDefault
-        };
-        option(order);
-    }
-    #region options
-    static void OptionSetMaxHP(string[] order)
-    {
-        if (order.Length != 4)
-        {
-            Warn();
-            return;
-        }
-        if (!int.TryParse(order[3], out int hp))
-        {
-            Warn($"HPの書式が不正です。");
-            return;
-        }
-        if (!TryStringToPlayer(order[2], out Player p))
-        {
-            Warn($"プレイヤー {order[2]} が見つかりませんでした。");
-            return;
-        }
-        p.MaxHP = hp;
-        p.ModifyMaxHP();
-        w.Message.Append($"{p.Name} の最大HPを {p.MaxHP} に設定しました。", DarkGreen);
-    }
-    static void OptionInfiniteSeed(string[] order)
-    {
-        if (order.Length != 3)
-        {
-            Warn();
-            return;
-        }
-        if (!order[2].TryStringToEnabler(out bool enabler))
-        {
-            Warn();
-            return;
-        }
-        if (enabler)
-        {
-            IsSeedInfinite = true;
-            w.Message.Append("やどりぎの継続ターン数を 無限 に変更しました。", DarkGreen);
-            return;
-        }
-        IsSeedInfinite = false;
-        w.Message.Append($"やどりぎの継続ターン数を {Player.MaxSeedTurn} ターン に変更しました。", DarkGreen);
-    }
-    static void OptionInfiniteCure(string[] order)
-    {
-        if (order.Length != 3)
-        {
-            Warn();
-            return;
-        }
-        if (!order[2].TryStringToEnabler(out bool enabler))
-        {
-            Warn();
-            return;
-        }
-        if (enabler)
-        {
-            IsCureInfinite = true;
-            w.Message.Append("医療タイプの単語で回復可能な回数を 無限 に変更しました。", DarkGreen);
-            return;
-        }
-        IsCureInfinite = false;
-        w.Message.Append($"医療タイプの単語で回復可能な回数を {Player.MaxCureCount}回 に変更しました。", DarkGreen);
-    }
-    static void OptionAbilChange(string[] order)
-    {
-        if (order.Length != 3)
-        {
-            Warn();
-            return;
-        }
-        if (!order[2].TryStringToEnabler(out bool enabler))
-        {
-            Warn();
-            return;
-        }
-        if (enabler)
-        {
-            IsAbilChangeable = true;
-            w.Message.Append($"とくせいの変更を有効にしました。(上限 {Player.MaxAbilChange}回 まで)", DarkGreen);
-            return;
-        }
-        IsAbilChangeable = false;
-        w.Message.Append($"とくせいの変更を無効にしました。", DarkGreen);
-
-    }
-    static void OptionStrict(string[] order)
-    {
-        if (order.Length != 3)
-        {
-            Warn();
-            return;
-        }
-        if (!order[2].TryStringToEnabler(out bool enabler))
-        {
-            Warn();
-            return;
-        }
-        if (enabler)
-        {
-            IsStrict = true;
-            w.Message.Append($"ストリクト モードを有効にしました。", DarkGreen);
-            return;
-        }
-        IsStrict = false;
-        w.Message.Append($"ストリクト モードを無効にしました。", DarkGreen);
-    }
-    static void OptionInfer(string[] order)
-    {
-        if (order.Length != 3)
-        {
-            Warn();
-            return;
-        }
-        if (!order[2].TryStringToEnabler(out bool enabler))
-        {
-            Warn();
-            return;
-        }
-        if (enabler)
-        {
-            IsInferable = true;
-            w.Message.Append($"タイプの推論を有効にしました。", DarkGreen);
-            return;
-        }
-        IsInferable = false;
-        w.Message.Append($"タイプの推論を無効にしました。", DarkGreen);
-    }
-    static void OptionSetAbilCount(string[] order)
-    {
-        if (order.Length != 3)
-        {
-            Warn();
-            return;
-        }
-        if (!int.TryParse(order[2], out int abilCount) || abilCount < 0)
-        {
-            Warn("とくせいの変更回数の入力が不正です。");
-            return;
-        }
-        Player.MaxAbilChange = abilCount;
-        w.Message.Append($"とくせいの変更回数上限を {Player.MaxAbilChange}回 に設定しました。", DarkGreen);
-    }
-    static void OptionSetMaxCureCount(string[] order)
-    {
-        if (order.Length != 3)
-        {
-            Warn();
-            return;
-        }
-        if (!int.TryParse(order[2], out int cureCount) || cureCount <= 0)
-        {
-            Warn("回復回数の入力が不正です。");
-            return;
-        }
-        Player.MaxCureCount = cureCount;
-        w.Message.Append($"医療タイプの単語による回復の回数上限を {Player.MaxCureCount}回 に設定しました。", DarkGreen);
-    }
-    static void OptionSetMaxFoodCount(string[] order)
-    {
-        if (order.Length != 3)
-        {
-            Warn();
-            return;
-        }
-        if (!int.TryParse(order[2], out int foodCount) || foodCount <= 0)
-        {
-            Warn("回復回数の入力が不正です。");
-            return;
-        }
-
-        Player.MaxFoodCount = foodCount;
-        w.Message.Append($"食べ物タイプの単語による回復の回数上限を {Player.MaxFoodCount}回 に設定しました。", DarkGreen);
-    }
-    static void OptionSetSeedDmg(string[] order)
-    {
-        if (order.Length != 3)
-        {
-            Warn();
-            return;
-        }
-        if (!int.TryParse(order[2], out int seedDmg) || seedDmg <= 0)
-        {
-            Warn("ダメージ値の入力が不正です。");
-            return;
-        }
-        Player.SeedDmg = seedDmg;
-        w.Message.Append($"やどりぎによるダメージを {Player.SeedDmg} に設定しました。", DarkGreen);
-    }
-    static void OptionSetMaxSeedTurn(string[] order)
-    {
-        if (order.Length != 3)
-        {
-            Warn();
-            return;
-        }
-        if (!int.TryParse(order[2], out int seedTurn) || seedTurn <= 0)
-        {
-            Warn("ターン数の入力が不正です。");
-            return;
-        }
-        Player.MaxSeedTurn = seedTurn;
-        w.Message.Append($"やどりぎの継続ターン数を {Player.MaxSeedTurn}ターン に設定しました。", DarkGreen);
-    }
-    static void OptionSetCritDmgMultiplier(string[] order)
-    {
-        if (order.Length != 3)
-        {
-            Warn();
-            return;
-        }
-        if (!double.TryParse(order[2], out double critDmg) || critDmg < 0)
-        {
-            Warn("ダメージ値の入力が不正です。");
-            return;
-        }
-        Player.CritDmg = critDmg;
-        w.Message.Append($"急所によるダメージ倍率を {Player.CritDmg}倍 に設定しました。", DarkGreen);
-    }
-    static void OptionSetInsBufQty(string[] order)
-    {
-        if (order.Length != 3)
-        {
-            Warn();
-            return;
-        }
-        if (!int.TryParse(order[2], out int insBufQty))
-        {
-            Warn("変化値の入力が不正です。");
-            return;
-        }
-        Player.InsBufQty = insBufQty;
-        w.Message.Append($"ほけん発動による攻撃力の変化を {Player.InsBufQty} 段階 に設定しました。", DarkGreen);
-    }
-    static void OptionSetMode(string[] order)
-    {
-        if (order.Length != 3)
-        {
-            Warn();
-            return;
-        }
-        var mode = order[2].StringToMode();
-        if (mode is SBMode.Empty)
-        {
-            Warn($"モード {order[2]} が見つかりません。");
-            return;
-        }
-        SetMode(mode);
-        w.Message.Append($"モードを {mode.ModeToString()} に設定しました。", DarkGreen);
-    }
-    static void OptionDefault(string[] order)
-    {
-        Warn($"オプション {order[1]} が存在しないか、書式が不正です。");
-    }
-    #endregion
     static void OnShowOrdered(object sender, CancellationTokenSource cts)
     {
         var orderline = (string[])sender;
@@ -580,7 +218,6 @@ class Program
     }
     static void OnHelpOrdered(object sender, CancellationTokenSource cts)
     {
-        IsSuspended = true;
         while (true)
         {
             Console.Clear();
@@ -637,7 +274,7 @@ class Program
                         ("(変更者を明示する場合)\n", White).WriteLine();
                         ($"(例): {CHANGE} いかすい      →   とくせいを「いかすい」に変更する\n"
                          + $"      {CHANGE} じぶん ロクロ →   「じぶん」という名前のプレイヤーのとくせいを「ロックンロール」に変更する\n", Cyan).WriteLine();
-                        ($"とくせいを変更するプレイヤーの名前は、直接名前を入力するか「{Player1}」「{Player2}」という名前で参照できます。\n"
+                        ($"とくせいを変更するプレイヤーの名前は、直接名前を入力するか「{PLAYER1}」「{PLAYER2}」という名前で参照できます。\n"
                          + "変更するプレイヤーを明示しない場合は、現在ターンが回ってきているプレイヤーを参照します。\n\n"
                          + "とくせいの表記の仕方については [ヘルプ] > [とくせいの入力法] もご参照ください。\n", Yellow).WriteLine();
                         ("...続けるには任意のキーを押してください...", White).WriteLine();
@@ -780,7 +417,7 @@ class Program
                         ("一部のキーワードについては、省略して入力することが可能です。\n"
                             + "具体的な一覧は以下の通りです。\n", Yellow).WriteLine();
                         ($"{CHANGE}: ch     {OPTION}: op     {SHOW}: sh     {RESET}: rs     {EXIT}: ex\n\n"
-                       + $"{Player1}: p1    {Player2}: p2    {ENABLE}: e    {DISABLE}: d\n\n"
+                       + $"{PLAYER1}: p1    {PLAYER2}: p2    {ENABLE}: e    {DISABLE}: d\n\n"
                        + $"{SET_MAX_HP}: smh   {INFINITE_SEED}: is    {INFINITE_CURE}: ic    {ABIL_CHANGE}: ac\n\n"
                        + $"{SET_ABIL_COUNT}: sac  {SET_MAX_CURE_COUNT}: smc   {SET_MAX_FOOD_COUNT}: smf\n\n"
                        + $"{SET_SEED_DMG}: ssd   {SET_MAX_SEED_TURN}: sms   {SET_CRIT_DMG_MULTIPLIER}: scd\n\n"
@@ -803,96 +440,15 @@ class Program
         ("ヘルプを終了します。任意のキーを押してください。", Yellow).WriteLine();
         Console.ReadLine();
         Console.Clear();
-        IsSuspended = false;
-    }
-    static void OnDefault(object sender, CancellationTokenSource cts)
-    {
-        var orderline = (string[])sender;
-        Word? word;
-        bool inferFlag;
-        if (IsInferable && orderline.Length == 1)
-        {
-            var name = KanaConverter.ToHiragana(orderline[0]).Replace('ヴ', 'ゔ');
-            inferFlag = TryInferWordTypes(name, out Word wordtemp);
-            word = wordtemp;
-        }
-        else
-        {
-            var type1 = orderline.Length > 1 ? orderline[1][0].CharToType() : WordType.Empty;
-            var type2 = orderline.Length > 1 ? orderline[1].Length == 2 ? orderline[1][1].CharToType() : WordType.Empty : WordType.Empty;
-            word = new Word(orderline[0], CurrentP, OtherP, type1, type2);
-            inferFlag = word.Name.IsWild() || new Regex("^[ぁ-ゔゟァ-ヴー]*$").IsMatch(word.Name);
-        }
-        var ct = word.IsBuf ? ContractType.Buf
-               : word.IsHeal ? ContractType.Heal
-               : word.IsSeed ? ContractType.Seed
-               : ContractType.Attack;
-        AppendLogMessage(ct, word);
-        var c = Contract.Create(ct, CurrentP, OtherP, word, new ContractArgs(PreActor, PreReceiver) { IsInferSuccessed = inferFlag });
-        c.Execute();
-        w.Message.AppendMany(c.Message);
-        if (c.DeadFlag) Reset(cts);
-        if (c.IsBodyExecuted) ToggleTurn();
     }
     #endregion
 
     #region minor methods
-    static void SetMode(SBMode mode)
-    {
-        if (mode is SBMode.Default)
-        {
-            p1.MaxHP = 60;
-            p1.ModifyMaxHP();
-            p2.MaxHP = 60;
-            p2.ModifyMaxHP();
-            IsSeedInfinite = false;
-            IsCureInfinite = false;
-            IsAbilChangeable = true;
-            Player.MaxAbilChange = 3;
-            Player.MaxCureCount = 5;
-            Player.MaxFoodCount = 6;
-            Player.SeedDmg = 5;
-            Player.MaxSeedTurn = 4;
-            Player.CritDmg = 1.5;
-            Player.InsBufQty = 3;
-            return;
-        }
-        if (mode is SBMode.Classic)
-        {
-            p1.MaxHP = 50;
-            p1.ModifyMaxHP();
-            p2.MaxHP = 50;
-            p2.ModifyMaxHP();
-            IsSeedInfinite = true;
-            IsCureInfinite = true;
-            IsAbilChangeable = false;
-            Player.MaxAbilChange = 3;
-            Player.MaxCureCount = 5;
-            Player.MaxFoodCount = 6;
-            Player.SeedDmg = 5;
-            Player.MaxSeedTurn = 4;
-            Player.CritDmg = 1.5;
-            Player.InsBufQty = 3;
-            return;
-        }
-        if (mode is SBMode.AgeOfSeed)
-        {
-            p1.MaxHP = 60;
-            p1.ModifyMaxHP();
-            p2.MaxHP = 60;
-            p2.ModifyMaxHP();
-            IsSeedInfinite = true;
-            IsCureInfinite = false;
-            IsAbilChangeable = true;
-            Player.MaxAbilChange = 3;
-            Player.MaxCureCount = 5;
-            Player.MaxFoodCount = 6;
-            Player.SeedDmg = 5;
-            Player.MaxSeedTurn = 4;
-            Player.CritDmg = 1.5;
-            Player.InsBufQty = 3;
-        }
-    }
+    /// <summary>
+    /// 辞書ディレクトリを取得します。
+    /// </summary>
+    /// <returns>辞書のディレクトリパス</returns>
+    /// <exception cref="DirectoryNotFoundException"></exception>
     static string GetDicPath()
     {
         // TODO: 「見つかるまで探索」処理の実装
@@ -927,7 +483,10 @@ class Program
         }
         throw new DirectoryNotFoundException("dic ディレクトリが見つかりませんでした。");
     }
-    static async Task ImportDictionary()
+    /// <summary>
+    /// 辞書の情報をインポートします。
+    /// </summary>
+    static async Task ImportDictionaryAsync()
     {
         using var noTypeWordsReader = new StreamReader(NoTypeWordsPath);
         using var exNoTypeWordReader = new StreamReader(NoTypeWordExPath);
@@ -952,17 +511,22 @@ class Program
             {
                 var line = await typedWordsReader.ReadLineAsync() ?? string.Empty;
                 var statedLine = line.Trim().Split();
-                if (statedLine.Length == 2) TypedWords.Add(statedLine[0], new() { statedLine[1].StringToType() });
-                else if (statedLine.Length == 3) TypedWords.Add(statedLine[0], new() { statedLine[1].StringToType(), statedLine[2].StringToType() });
+                if (statedLine.Length == 2) TypedWords.TryAdd(statedLine[0], new() { statedLine[1].StringToType() });
+                else if (statedLine.Length == 3) TypedWords.TryAdd(statedLine[0], new() { statedLine[1].StringToType(), statedLine[2].StringToType() });
             }
         }
     }
-    static void SetUp()
+    /// <summary>
+    /// 初期設定を行います。
+    /// </summary>
+    /// <returns>プレイヤーの初期情報</returns>
+    static (Player, Player) SetUp()
     {
+        Player p1, p2;
         ("しりとりバトルシミュレーターへようこそ。", Yellow).WriteLine();
         while (true)
         {
-            var NGNamesList = new[] { "p1", "p2", Player1, Player2 };
+            var NGNamesList = new[] { "p1", "p2", PLAYER1, PLAYER2 };
             string? p1Name, p2Name;
             const string DEFAULT_P1_NAME = "じぶん";
             const string DEFAULT_P2_NAME = "あいて";
@@ -1029,17 +593,20 @@ class Program
             Console.Clear();
             break;
         }
+        return (p1, p2);
     }
+    /// <summary>
+    /// <see cref="Battle.OnReset"/>に渡すハンドラーです。
+    /// </summary>
     static void Reset(CancellationTokenSource cts)
     {
-        IsSuspended = true;
-        w.Message.Append("やり直す？", Yellow);
-        w.Message.Append("\n");
-        w.Message.Append("やり直す！ → 任意のキーを入力", Yellow);
-        w.Message.Append("ログを表示 → l キーを入力", Yellow);
-        w.Message.Append("もうやめる！ → r キーを入力", Yellow);
+        window.Message.Append("やり直す？", Yellow);
+        window.Message.Append("\n");
+        window.Message.Append("やり直す！ → 任意のキーを入力", Yellow);
+        window.Message.Append("ログを表示 → l キーを入力", Yellow);
+        window.Message.Append("もうやめる！ → r キーを入力", Yellow);
         Refresh();
-        w.WriteLine();
+        window.WriteLine();
         var order = Console.ReadLine() ?? string.Empty;
         if (order == "r")
         {
@@ -1052,88 +619,72 @@ class Program
             cts.Cancel();
             ShowLog();
             Console.Clear();
-            w.Message.Clear();
-            w.Message.Log.Clear();
-            UsedWords = new();
-            IsP1sTurn = true;
+            window.Message.Clear();
+            window.Message.Log.Clear();
             Main();
         }
         else
         {
             cts.Cancel();
             Console.Clear();
-            w.Message.Clear();
-            w.Message.Log.Clear();
-            UsedWords = new();
-            IsP1sTurn = true;
+            window.Message.Clear();
+            window.Message.Log.Clear();
             Main();
         }
     }
-    static bool TryInferWordTypes(string name, out Word word)
+    /// <summary>
+    /// <see cref="Battle.Out"/>に渡すハンドラーです。
+    /// </summary>
+    /// <param name="msgs">出力するアノテーション付き文字列のリスト</param>
+    static void Output(List<AnnotatedString> msgs)
     {
-        if (name.IsWild())
+        foreach (var msg in msgs)
         {
-            word = new Word(name, CurrentP, OtherP, WordType.Empty);
-            return true;
+            if (msg.IsLog)
+                window.Message.Log.Append((ColoredString)msg);
+            else
+            {
+                window.Message.Append((ColoredString)msg);
+                window.Message.Log.Append((ColoredString)msg);
+            }
         }
-        if (TypedWords.TryGetValue(name, out var types))
-        {
-            var type1 = types[0];
-            var type2 = types.Count > 1 ? types[1] : WordType.Empty;
-            word = new Word(name, CurrentP, OtherP, type1, type2);
-            return true;
-        }
-        if (NoTypeWords.Contains(name) || NoTypeWordEx.Contains(name))
-        {
-            word = new Word(name, CurrentP, OtherP, WordType.Empty);
-            return true;
-        }
-        word = new Word();
-        return false;
+        Refresh();
+        window.WriteLine();
     }
-    static void ToggleTurn()
-    {
-        PreActor = CurrentP.Clone();
-        PreReceiver = OtherP.Clone();
-        IsP1sTurn = !IsP1sTurn;
-        w.Message.Append($"{CurrentP.Name} のターンです", Yellow);
-        w.Message.Log.Append($"{p1.Name}: {p1.HP}/{p1.MaxHP},     {p2.Name}: {p2.HP}/{p2.MaxHP}", DarkYellow);
-    }
-    static void AppendLogMessage(ContractType ct, Word word)
-    {
-        w.Message.Log.Append(ct switch
-        {
-            ContractType.Attack => $"{CurrentP.Name} は単語 {word} で攻撃した！",
-            ContractType.Buf => $"{CurrentP.Name} は単語 {word} で能力を高めた！",
-            ContractType.Heal => $"{CurrentP.Name} は単語 {word} を使った！",
-            ContractType.Seed => $"{CurrentP.Name} は単語 {word} でやどりぎを植えた！",
-            _ => throw new ArgumentException($"ContractType \"{ct}\" is not implemented.")
-        }, DarkCyan);
-    }
+    /// <summary>
+    /// <see cref="Window"/>を初期化します。
+    /// </summary>
     static void Refresh()
     {
-        w.StatusFieldPlayer1 = $"{p1.Name}: {p1.HP}/{p1.MaxHP}";
-        w.StatusFieldPlayer2 = $"{p2.Name}: {p2.HP}/{p2.MaxHP}";
-        w.WordFieldPlayer1 = $"{p1.Name}:\n       {p1.CurrentWord}";
-        w.WordFieldPlayer2 = $"{p2.Name}:\n       {p2.CurrentWord}";
+        window.StatusFieldPlayer1 = $"{battle.Player1.Name}: {battle.Player1.HP}/{battle.Player1.MaxHP}";
+        window.StatusFieldPlayer2 = $"{battle.Player2.Name}: {battle.Player2.HP}/{battle.Player2.MaxHP}";
+        window.WordFieldPlayer1 = $"{battle.Player1.Name}:\n       {battle.Player1.CurrentWord}";
+        window.WordFieldPlayer2 = $"{battle.Player2.Name}:\n       {battle.Player2.CurrentWord}";
     }
+    /// <summary>
+    /// 警告を表示します。
+    /// </summary>
+    /// <param name="s">警告のメッセージ</param>
     static void Warn(string s = WARNING)
     {
-        w.Message.Append(s, Red);
+        window.Message.Append(s, Red);
     }
+    /// <summary>
+    /// プレイヤーのステータスを表示します。
+    /// </summary>
     static void ShowStatus()
     {
-        IsSuspended = true;
         Console.Clear();
-        ("\n" + p1.GetStatusString() + p2.GetStatusString() + $"\n現在のターン: {CurrentP.Name}\n\n\n\n", Yellow).WriteLine();
+        ("\n" + battle.Player1.GetStatusString() + battle.Player2.GetStatusString() + $"\n現在のターン: {battle.CurrentPlayer.Name}\n\n\n\n", Yellow).WriteLine();
         ("終了するには、任意のキーを押してください. . . ", White).WriteLine();
         Console.ReadLine();
         Console.Clear();
-        IsSuspended = false;
     }
+    /// <summary>
+    /// オプションの状態を表示します。
+    /// </summary>
     static void ShowOptions()
     {
-        IsSuspended = true;
         Console.Clear();
         ("\n"
          + $"{INFINITE_SEED}:      {IsSeedInfinite}\n\n"
@@ -1151,11 +702,12 @@ class Program
         ("終了するには、任意のキーを押してください. . . ", White).WriteLine();
         Console.ReadLine();
         Console.Clear();
-        IsSuspended = false;
     }
+    /// <summary>
+    /// アプリケーションの情報を表示します。
+    /// </summary>
     static void ShowInfo()
     {
-        IsSuspended = true;
         Console.Clear();
         ("情報\n\n"
          + $"・現在のバージョン: {Version}\n\n"
@@ -1168,21 +720,22 @@ class Program
         ("終了するには、任意のキーを押してください. . . ", White).WriteLine();
         Console.ReadLine();
         Console.Clear();
-        IsSuspended = false;
     }
+    /// <summary>
+    /// ログを表示します。
+    /// </summary>
     static void ShowLog()
     {
-        IsSuspended = true;
         Console.Clear();
         var height = Console.WindowHeight - 13;
-        if (w.Message.Log.Content.Count > height)
+        if (window.Message.Log.Content.Count > height)
         {
             var logList = new List<MessageLog>();
-            var numOfPages = w.Message.Log.Content.Count / height + 1;
+            var numOfPages = window.Message.Log.Content.Count / height + 1;
             for (var i = 0; i < numOfPages; i++)
             {
                 var page = new MessageLog();
-                page.AppendMany(w.Message.Log.Content.Skip(i * height).Take(height));
+                page.AppendMany(window.Message.Log.Content.Skip(i * height).Take(height));
                 logList.Add(page);
             }
             var index = 0;
@@ -1202,8 +755,8 @@ class Program
                     break;
                 else if (order == "c")
                 {
-                    w.Message.Clear();
-                    w.Message.Log.Clear();
+                    window.Message.Clear();
+                    window.Message.Log.Clear();
                     Console.Clear();
                     Console.WriteLine("ログを消去しました。任意のキーを押してください. . .");
                     Console.ReadLine();
@@ -1227,7 +780,7 @@ class Program
             {
                 Console.Clear();
                 ("ログ", White).WriteLine();
-                w.Message.Log.WriteLine();
+                window.Message.Log.WriteLine();
                 ("\nログを消去するには c キーを押してください", White).WriteLine();
                 ("\n終了するには、r キーを押してください", White).WriteLine();
                 var order = Console.ReadLine() ?? string.Empty;
@@ -1235,8 +788,8 @@ class Program
                     break;
                 else if (order == "c")
                 {
-                    w.Message.Clear();
-                    w.Message.Log.Clear();
+                    window.Message.Clear();
+                    window.Message.Log.Clear();
                     Console.Clear();
                     Console.WriteLine("ログを消去しました。任意のキーを押してください. . .");
                     Console.ReadLine();
@@ -1245,79 +798,63 @@ class Program
             }
         }
         Console.Clear();
-        IsSuspended = false;
     }
+    /// <summary>
+    /// アプリケーションを終了時の処理を行います。
+    /// </summary>
     static void ExitApp()
     {
         Console.Clear();
         ("アプリケーションを終了します。任意のキーを押してください. . .", Yellow).WriteLine();
         Console.ReadLine();
     }
-    static bool TryStringToPlayer(string s, out Player p)
-    {
-        if (s == p1.Name || s is Player1 or "p1")
-        {
-            p = p1;
-            return true;
-        }
-        if (s == p2.Name || s is Player2 or "p2")
-        {
-            p = p2;
-            return true;
-        }
-        p = new();
-        return false;
-    }
     #endregion
 
     // WARNING: デバッグ用　使うな！
     #region DEBUG
-    static void __OnAddOrdered(object sender, CancellationTokenSource cts)
+    static void __OnAddOrdered(string[] order, CancellationTokenSource cts)
     {
-        var orderline = (string[])sender;
-        if (orderline.Length != 2)
+        if (order.Length != 2)
         {
             Warn();
             return;
         }
-        if (NoTypeWords.Contains(orderline[1]) || NoTypeWordEx.Contains(orderline[1]) || TypedWords.ContainsKey(orderline[1]))
+        if (NoTypeWords.Contains(order[1]) || NoTypeWordEx.Contains(order[1]) || TypedWords.ContainsKey(order[1]))
         {
-            Warn($"単語「{orderline[1]}」は既に辞書に含まれています。");
+            Warn($"単語「{order[1]}」は既に辞書に含まれています。");
             return;
         }
         var kanaCheck = new Regex(@"^[\u3040-\u309Fー]+$");
-        if (!kanaCheck.IsMatch(orderline[1]))
+        if (!kanaCheck.IsMatch(order[1]))
         {
             Warn("ひらがな以外を含む入力は無効です。");
             return;
         }
         using var file = new StreamWriter(NoTypeWordExPath, true, Encoding.UTF8);
-        NoTypeWordEx.Add(orderline[1]);
-        file.WriteLine(orderline[1]);
-        w.Message.Append($"単語「{orderline[1]}」を辞書に追加しました。", Yellow);
+        NoTypeWordEx.Add(order[1]);
+        file.WriteLine(order[1]);
+        window.Message.Append($"単語「{order[1]}」を辞書に追加しました。", Yellow);
     }
-    static void __OnRemoveOrdered(object sender, CancellationTokenSource cts)
+    static void __OnRemoveOrdered(string[] order, CancellationTokenSource cts)
     {
-        var orderline = (string[])sender;
-        if (orderline.Length != 2)
+        if (order.Length != 2)
         {
             Warn();
             return;
         }
-        if (!NoTypeWordEx.Contains(orderline[1]))
+        if (!NoTypeWordEx.Contains(order[1]))
         {
-            Warn($"単語「{orderline[1]}」は拡張辞書に含まれていません。");
+            Warn($"単語「{order[1]}」は拡張辞書に含まれていません。");
             return;
         }
         using var file = new StreamWriter(NoTypeWordExPath, false, Encoding.UTF8);
-        NoTypeWordEx.Remove(orderline[1]);
+        NoTypeWordEx.Remove(order[1]);
         foreach (var i in NoTypeWordEx)
             file.WriteLine(i);
-        w.Message.Append($"単語「{orderline[1]}」を辞書から削除しました。", Yellow);
+        window.Message.Append($"単語「{order[1]}」を辞書から削除しました。", Yellow);
     }
-    static void __OnSearchOrdered(object sender, CancellationTokenSource cts)
+    static void __OnSearchOrdered(string[] order, CancellationTokenSource cts)
     {
-        IsSuspended = true;
         var searchMsg = new MessageBox();
         while (true)
         {
@@ -1332,33 +869,33 @@ class Program
             searchMsg.Append("終了するには「-q」と入力してください。", Cyan);
             searchMsg.WriteLine();
             searchMsg.Clear();
-            var order = Console.ReadLine()?.Trim().Split() ?? Array.Empty<string>();
-            if (order.Length < 1 || string.IsNullOrWhiteSpace(order[0]))
+            var orderSearchLog = Console.ReadLine()?.Trim().Split() ?? Array.Empty<string>();
+            if (orderSearchLog.Length < 1 || string.IsNullOrWhiteSpace(orderSearchLog[0]))
                 continue;
-            if (order[0] == "-q")
+            if (orderSearchLog[0] == "-q")
             {
                 Console.Clear();
                 Console.WriteLine("ワードサーチモードを終了します。\n\n任意のキーを押してください. . . ");
                 Console.ReadLine();
                 break;
             }
-            if (order[0] == "-m")
+            if (orderSearchLog[0] == "-m")
             {
                 __ShowWordSearchManual();
                 continue;
             }
-            var cond = order[0];
+            var cond = orderSearchLog[0];
             int searchOption = 0;
             int dicOption = 0;
-            if (order.Length > 1 && !__TryStringToSearchOption(order[1], out searchOption))
+            if (orderSearchLog.Length > 1 && !__TryStringToSearchOption(orderSearchLog[1], out searchOption))
             {
-                searchMsg.Append($"サーチオプション{order[1]}が見つかりませんでした。", Red);
+                searchMsg.Append($"サーチオプション{orderSearchLog[1]}が見つかりませんでした。", Red);
                 Console.Clear();
                 continue;
             }
-            if (order.Length > 2 && !__TryStringToDicOption(order[2], out dicOption))
+            if (orderSearchLog.Length > 2 && !__TryStringToDicOption(orderSearchLog[2], out dicOption))
             {
-                searchMsg.Append($"辞書オプション{order[2]}が見つかりませんでした。", Red);
+                searchMsg.Append($"辞書オプション{orderSearchLog[2]}が見つかりませんでした。", Red);
                 Console.Clear();
                 continue;
             }
@@ -1447,8 +984,10 @@ class Program
              */
         }
         Console.Clear();
-        IsSuspended = false;
     }
+    /// <summary>
+    /// ワードサーチモードの操作方法を表示します。
+    /// </summary>
     static void __ShowWordSearchManual()
     {
         Console.Clear();
@@ -1480,17 +1019,12 @@ class Program
         ("続けるには、任意のキーを押してください. . . ", White).WriteLine();
         Console.ReadLine();
     }
+
+    // FIXME: 「ゔ」のサーチがうまくいかない。（「\u3094」でマッチすればうまくいく）
     static bool __TrySearch(string name, int searchOption, int dicOption, out List<string> words)
     {
         bool result = false;
         words = new();
-        var dic = dicOption switch
-        {
-            1 => NoTypeWords,
-            2 => NoTypeWordEx,
-            3 => TypedWords.Keys.ToList(),
-            _ => NoTypeWords.Concat(NoTypeWordEx).Concat(TypedWords.Keys).ToList()
-        };
         var r = new Regex(searchOption switch
         {
             0 => $"^{name}$",
@@ -1502,6 +1036,13 @@ class Program
             6 => name,
             _ => name
         });
+        var dic = dicOption switch
+        {
+            1 => NoTypeWords,
+            2 => NoTypeWordEx,
+            3 => TypedWords.Keys.ToList(),
+            _ => NoTypeWords.Concat(NoTypeWordEx).Concat(TypedWords.Keys).ToList()
+        };
         if (name[0] == name[^1] && searchOption == 4)
             r = new Regex($"^{name[0]}\\w*{name[^1]}ー*$|^{name[0]}ー*$");
         foreach (var i in dic)
@@ -1515,7 +1056,7 @@ class Program
         words = words.Distinct().ToList();
         return result;
     }
-    static void __OnErrorOrdered(object sender, CancellationTokenSource cts)
+    static void __OnErrorOrdered(string[] order, CancellationTokenSource cts)
     {
         __Error();
     }
@@ -1523,9 +1064,9 @@ class Program
     {
         Console.WriteLine((new int[6])[9]);
     }
-    static bool __TryStringToSearchOption(string order, out int option)
+    static bool __TryStringToSearchOption(string str, out int option)
     {
-        (var result, option) = order switch
+        (var result, option) = str switch
         {
             "m" => (true, 0),
             "c" => (true, 1),
@@ -1538,9 +1079,9 @@ class Program
         };
         return result;
     }
-    static bool __TryStringToDicOption(string order, out int option)
+    static bool __TryStringToDicOption(string str, out int option)
     {
-        (var result, option) = order switch
+        (var result, option) = str switch
         {
             "e" => (true, 0),
             "n" => (true, 1),

@@ -2,7 +2,6 @@
 using static SBSimulator.Source.SBOptions;
 
 namespace SBSimulator.Source;
-
 internal static class SBExtention
 {
     #region methods
@@ -186,6 +185,15 @@ internal static class SBExtention
     public static void Add(this List<ColoredString> list, string text, ConsoleColor color)
     {
         list.Add(new(text, color));
+    }
+    public static void Add(this List<AnnotatedString> list, string text, Notice notice)
+    {
+        list.Add(new(text, notice));
+    }
+    public static void AddMany(this List<AnnotatedString> list, IEnumerable<AnnotatedString> msgs)
+    {
+        foreach (var msg in msgs)
+            list.Add(msg);
     }
     public static void WriteLine(this (string, ConsoleColor) cString)
     {
