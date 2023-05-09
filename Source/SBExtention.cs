@@ -5,6 +5,28 @@ namespace SBSimulator.Source;
 internal static class SBExtention
 {
     #region methods
+    public static char GetRandomChar()
+    {
+        var charList = new List<char>
+        {
+            'あ', 'い', 'う', 'え', 'お',
+            'か', 'き', 'く', 'け', 'こ',
+            'さ', 'し', 'す', 'せ', 'そ',
+            'た', 'ち', 'つ', 'て', 'と',
+            'な', 'に', 'ね', 'の',
+            'は', 'ひ', 'ふ', 'へ', 'ほ',
+            'ま', 'み', 'む' ,'め', 'も',
+            'や', 'ゆ', 'よ',
+            'ら', 'り', 'る', 'れ', 'ろ',
+            'わ'
+        };
+        return charList[new Random().Next(charList.Count)];
+    }
+    /// <summary>
+    /// <see cref="WordType"/>列挙型を文字列に変換します。
+    /// </summary>
+    /// <param name="type">変換する<see cref="WordType"/>列挙型のインスタンス</param>
+    /// <returns>変換された文字列のインスタンス</returns>
     public static string TypeToString(this WordType type)
     {
         return type switch
@@ -38,6 +60,11 @@ internal static class SBExtention
             _ => "天で話にならねぇよ..."
         };
     }
+    /// <summary>
+    /// 文字を<see cref="WordType"/>列挙型に変換します。
+    /// </summary>
+    /// <param name="symbol"><see cref="WordType"/>に変換する文字</param>
+    /// <returns>変換された<see cref="WordType"/>列挙型のインスタンス</returns>
     public static WordType CharToType(this char symbol)
     {
         return symbol switch
@@ -70,6 +97,11 @@ internal static class SBExtention
             _ => WordType.Empty // I is not used
         };
     }
+    /// <summary>
+    /// 文字列を<see cref="WordType"/>列挙型に変換します。
+    /// </summary>
+    /// <param name="symbol"><see cref="WordType"/>に変換する文字列</param>
+    /// <returns>変換された<see cref="WordType"/>列挙型のインスタンス</returns>
     public static WordType StringToType(this string symbol)
     {
         return symbol switch
@@ -102,6 +134,12 @@ internal static class SBExtention
             _ => WordType.Empty
         };
     }
+    /// <summary>
+    /// <see cref="Player.PlayerState"/>列挙型を対応する文字列に変換します。
+    /// </summary>
+    /// <param name="state">変換する<see cref="Player.PlayerState"/>列挙型のインスタンス</param>
+    /// <returns>変換した文字列のインスタンス</returns>
+    /// <exception cref="ArgumentException"></exception>
     public static string StateToString(this Player.PlayerState state)
     {
         return state switch
@@ -113,6 +151,12 @@ internal static class SBExtention
             _ => throw new ArgumentException($"PlayerState \"{state}\" has not been found.")
         };
     }
+    /// <summary>
+    /// 文字列を論理値に変換します。
+    /// </summary>
+    /// <param name="str">変換する文字列のインスタンス</param>
+    /// <param name="enabler">変換された論理値のインスタンス</param>
+    /// <returns>変換が成功したかどうかを表すフラグ</returns>
     public static bool TryStringToEnabler(this string str, out bool enabler)
     {
         if (str is Program.ENABLE or "E" or "e" or "T" or "t")
@@ -128,14 +172,29 @@ internal static class SBExtention
         enabler = false;
         return false;
     }
+    /// <summary>
+    /// 指令した文字がワイルドカード文字であるかどうかを判定します。
+    /// </summary>
+    /// <param name="c">判定を受ける文字のインスタンス</param>
+    /// <returns>文字がワイルドカードであるかどうかを表すフラグ</returns>
     public static bool IsWild(this char c)
     {
         return c is '*' or '＊';
     }
+    /// <summary>
+    /// 指定した文字列がワイルドカードを含むかどうかを判定します。
+    /// </summary>
+    /// <param name="name">判定を受ける文字列のインスタンス</param>
+    /// <returns>文字列がワイルドカードを含むかどうかを表すフラグ</returns>
     public static bool IsWild(this string name)
     {
         return name.Contains('*') || name.Contains('＊');
     }
+    /// <summary>
+    /// 文字列を<see cref="SBMode"/>列挙型に変換します。
+    /// </summary>
+    /// <param name="symbol">変換する文字列のインスタンス</param>
+    /// <returns>変換した<see cref="SBMode"/>列挙型のインスタンス</returns>
     public static SBMode StringToMode(this string symbol)
     {
         return symbol switch
@@ -146,6 +205,12 @@ internal static class SBExtention
             _ => SBMode.Empty
         };
     }
+    /// <summary>
+    /// 二つの文字がしりとりのルール上一致するかを判定します。
+    /// </summary>
+    /// <param name="previous">判定元になる文字</param>
+    /// <param name="current">判定先の文字</param>
+    /// <returns>文字がしりとりのルール上一致するかどうかを表すフラグ</returns>
     public static bool WordlyEquals(this char previous, char current)
     {
         if (previous == current
@@ -164,6 +229,11 @@ internal static class SBExtention
             return true;
         return false;
     }
+    /// <summary>
+    /// <see cref="SBMode"/>列挙型を文字列に変換します。
+    /// </summary>
+    /// <param name="mode">変換する<see cref="SBMode"/>列挙型のインスタンス</param>
+    /// <returns>変換した文字列のインスタンス</returns>
     public static string ModeToString(this SBMode mode)
     {
         return mode switch
@@ -174,6 +244,13 @@ internal static class SBExtention
             _ => "EMPTY"
         };
     }
+    /// <summary>
+    /// 指定した要素で空の<see cref="List{T}"/>を埋めます。
+    /// </summary>
+    /// <typeparam name="T">リストを埋める要素の型</typeparam>
+    /// <param name="list">空のリスト</param>
+    /// <param name="content">リストを埋める要素</param>
+    /// <returns></returns>
     public static List<T> Fill<T>(this List<T> list, T content)
     {
         for (var i = 0; i < list.Capacity; i++)
@@ -182,24 +259,39 @@ internal static class SBExtention
         }
         return list;
     }
-    public static void Add(this List<ColoredString> list, string text, ConsoleColor color)
-    {
-        list.Add(new(text, color));
-    }
+    /// <summary>
+    /// <see cref="List{T}"/>の末尾に<see cref="AnnotatedString"/>要素を追加します。
+    /// </summary>
+    /// <param name="list">要素を追加するリスト</param>
+    /// <param name="text">追加する文字列要素</param>
+    /// <param name="notice">追加する文字列要素のアノテーション</param>
     public static void Add(this List<AnnotatedString> list, string text, Notice notice)
     {
         list.Add(new(text, notice));
     }
+    /// <summary>
+    /// <see cref="List{T}"/>の末尾に複数の<see cref="AnnotatedString"/>要素を追加します。
+    /// </summary>
+    /// <param name="list">要素を追加するリスト</param>
+    /// <param name="msgs">追加する<see cref="AnnotatedString"/>のコレクション</param>
     public static void AddMany(this List<AnnotatedString> list, IEnumerable<AnnotatedString> msgs)
     {
         foreach (var msg in msgs)
             list.Add(msg);
     }
+    /// <summary>
+    /// 色付き文字列を出力します。
+    /// </summary>
+    /// <param name="cString">出力する<see cref="ColoredString"/>のインスタンス</param>
     public static void WriteLine(this (string, ConsoleColor) cString)
     {
         var (text, color) = cString;
         new ColoredString(text, color).WriteLine();
     }
+    /// <summary>
+    /// 色付き文字列を、末尾の改行を行わずに出力します。
+    /// </summary>
+    /// <param name="cString">出力する<see cref="ColoredString"/>のインスタンス</param>
     public static void Write(this (string, ConsoleColor) cString)
     {
         var (text, color) = cString;

@@ -3,7 +3,7 @@ using static SBSimulator.Source.SBOptions;
 namespace SBSimulator.Source;
 
 // カスタム特性のテスト。
-// CustomAbility クラス、を継承して実装する。 
+// CustomAbility クラスを継承して実装する。 
 
 /// <summary>
 /// カスタム特性の作成時に使用するクラスです。

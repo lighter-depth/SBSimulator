@@ -592,6 +592,11 @@ internal class HealContract : Contract
                 Actor.DePoison();
             }
             Message.Add($"{Actor.Name} の体力が回復した", Notice.HealInfo);
+            return;
+        }
+        if (CanHeal)
+        {
+            Message.Add($"{Actor.Name} の体力が回復した", Notice.HealInfo);
         }
     }
 }

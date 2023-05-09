@@ -8,7 +8,7 @@ namespace SBSimulator.Source;
 // Program クラスで行っている処理を抽出したクラス。
 // 文字列で入力し、アノテーション付き文字列で出力する。
 /// <summary>
-/// バトル単位の処理を管理するクラス。
+/// バトル単位の処理を管理するクラスです。
 /// </summary>
 internal class Battle
 {
@@ -76,15 +76,15 @@ internal class Battle
     /// <summary>
     /// インスタンスを実行します。
     /// </summary>
-    /// <param name="custom"> <see cref="Initialize(Dictionary{string, Action{string[], CancellationTokenSource}})"/>に渡すハンドラーの情報 </param>
+    /// <param name="custom"> <see cref="Initialize"/>に渡すハンドラーの情報 </param>
     public void Run(Dictionary<string, Action<string[], CancellationTokenSource>> custom)
     {
         Initialize(custom);
         Out(Buffer);
-        Buffer.Clear();
         var cts = new CancellationTokenSource();
         while (!cts.IsCancellationRequested)
         {
+            Buffer.Clear();
             // 入力処理、CPU かどうかを判定
             var order = CurrentPlayer is not CPUPlayer cpu ? In() : cpu.Execute();
             if (order.Length == 0 || string.IsNullOrWhiteSpace(order[0])) continue;
@@ -97,7 +97,6 @@ internal class Battle
 
             // 出力処理
             Out(Buffer);
-            Buffer.Clear();
 
         }
     }
@@ -108,7 +107,8 @@ internal class Battle
     /// <param name="custom"> カスタムで追加するハンドラーの情報 </param>
     private void Initialize(Dictionary<string, Action<string[], CancellationTokenSource>> custom)
     {
-        SetMode(SBMode.Default);
+        IsPlayer1sTurn = InitIsP1sTurn();
+        if(!Program.IsMaxHPModifiedOnSetUp) SetMode(SBMode.Default);
         Buffer.Add($"{CurrentPlayer.Name} のターンです", Notice.General);
         Buffer.Add($"{Player1.Name}: {Player1.HP}/{Player1.MaxHP},     {Player2.Name}: {Player2.HP}/{Player2.MaxHP}", Notice.LogInfo);
         OrderFunctions = new()
@@ -119,6 +119,25 @@ internal class Battle
             ["op"] = OnOptionOrdered,
         };
         OrderFunctions = OrderFunctions.Concat(custom.Where(pair => !OrderFunctions.ContainsKey(pair.Key))).ToDictionary(pair => pair.Key, pair => pair.Value);
+    }
+    /// <summary>
+    /// 先攻・後攻の設定を行います。
+    /// </summary>
+    /// <returns><see cref="Player1"/>が先攻するかどうかを表すフラグ</returns>
+    private bool InitIsP1sTurn()
+    {
+        var randomFlag = new Random().Next(2) == 0;
+        var p1TPA = TurnProceedingArbiter.Random;
+        var p2TPA = TurnProceedingArbiter.Random;
+        if (Player1 is CPUPlayer cpu1) p1TPA = cpu1.Proceeding;
+        if (Player2 is CPUPlayer cpu2) p2TPA = cpu2.Proceeding;
+        if (p1TPA == TurnProceedingArbiter.True && p1TPA == p2TPA) return randomFlag;
+        if (p1TPA == TurnProceedingArbiter.False && p1TPA == p2TPA) return randomFlag;
+        if (p1TPA == TurnProceedingArbiter.True) return true;
+        if (p2TPA == TurnProceedingArbiter.True) return false;
+        if (p1TPA == TurnProceedingArbiter.False) return false;
+        if (p2TPA == TurnProceedingArbiter.False) return true;
+        return randomFlag;
     }
 
     /// <summary>
@@ -608,14 +627,14 @@ internal class Battle
             word = new Word(name, CurrentPlayer, OtherPlayer, WordType.Empty);
             return true;
         }
-        if (Program.TypedWords.TryGetValue(name, out var types))
+        if (SBDictionary.TypedWords.TryGetValue(name, out var types))
         {
             var type1 = types[0];
             var type2 = types.Count > 1 ? types[1] : WordType.Empty;
             word = new Word(name, CurrentPlayer, OtherPlayer, type1, type2);
             return true;
         }
-        if (Program.NoTypeWords.Contains(name) || Program.NoTypeWordEx.Contains(name))
+        if (SBDictionary.NoTypeWords.Contains(name) || SBDictionary.NoTypeWordEx.Contains(name))
         {
             word = new Word(name, CurrentPlayer, OtherPlayer, WordType.Empty);
             return true;

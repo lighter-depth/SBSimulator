@@ -1,9 +1,10 @@
 ﻿using static SBSimulator.Source.Word;
 using static SBSimulator.Source.SBOptions;
+using static SBSimulator.Source.SBExtention;
 
 namespace SBSimulator.Source;
 /// <summary>
-/// プレイヤーの情報を管理するクラス。
+/// プレイヤーの情報を管理するクラスです。
 /// </summary>
 internal class Player
 {
@@ -12,7 +13,11 @@ internal class Player
     /// <summary>
     /// 名前
     /// </summary>
-    public string Name { get; init; } = "じぶん";
+    public string Name { get; set; } = "じぶん";
+    /// <summary>
+    /// 呼び出し元の<see cref="Battle"/>クラスの情報
+    /// </summary>
+    public Battle? Parent { get; private set; }
 
     /// <summary>
     /// 残り体力
@@ -47,7 +52,7 @@ internal class Player
     /// <summary>
     /// とくせいの情報
     /// </summary>
-    public Ability Ability { get; private set; } = null!;
+    public Ability Ability { get; set; } = new Debugger();
 
     /// <summary>
     /// 食べ物タイプの単語を使用した回数
@@ -72,7 +77,7 @@ internal class Player
     /// <summary>
     /// 最大体力の値
     /// </summary>
-    public int MaxHP { get; set; } = 60;
+    public virtual int MaxHP { get; set; } = 60;
 
     /// <summary>
     /// 使用した動物タイプの情報を保持するリスト
@@ -381,6 +386,14 @@ internal class Player
     {
         return (Player)MemberwiseClone();
     }
+    /// <summary>
+    /// <see cref="Battle"/>クラスの情報を登録します。
+    /// </summary>
+    /// <param name="parent">登録する<see cref="Battle"/>クラスのインスタンス</param>
+    public void Register(Battle parent)
+    {
+        Parent = parent;
+    }
     #endregion
 
     #region minor classes
@@ -402,13 +415,4 @@ internal class Player
         public void Increment() => Rep++;
     }
     #endregion
-}
-
-// CPU クラスの骨格
-internal class CPUPlayer : Player
-{
-    public string[] Execute() 
-    {
-        return Array.Empty<string>();
-    }
 }

@@ -56,19 +56,23 @@ using Umayadia.Kana;
  * 　例外を発生させ、アプリケーションを停止させる。
  */
 
-// TODO: 辞書ディレクトリ探索の改善
 // TODO: ユーザー定義の無属性・有属性辞書の作成
 // TODO: オミット辞書の作成
-// TODO: 辞書パース機能の実装
 // TODO: 起動直後のパフォーマンス改善
-// TODO: Battle クラスの作成（ターン制御の抽象化）
 // TODO: 状態異常の埋め込み解消（PlayerState クラス作成）
+// TODO: モードの埋め込み解消 (SBMode クラス作成)
+// TODO: CPUに固有の初期設定の反映
+// TODO; ワイルドカード使用時にCPUがフリーズするバグの修正
+// TODO: コマンドラインのオブジェクト化(SBOrder クラス作成)
+// TODO: CPUの単語検索のランダム化
+// TODO: 即死検索メソッドの実装
+
 namespace SBSimulator.Source;
 
 class Program
 {
     #region static fields
-    static readonly string Version = "v0.4.1";
+    static readonly string Version = "v0.4.5";
     static readonly Window window = new();
     static Battle battle = new();
     static readonly string DicDir = GetDicPath();
@@ -76,17 +80,9 @@ class Program
     static readonly string NoTypeWordExPath = DicDir + @"\no type\no-type-word-extension.csv";
     static readonly string TypedWordsPath = DicDir + @"\typed";
     /// <summary>
-    /// タイプ無し単語の情報
+    /// HPのリセットを正常に行うためのフラグです。
     /// </summary>
-    public static List<string> NoTypeWords { get; private set; } = new();
-    /// <summary>
-    /// 拡張タイプ無し単語の情報
-    /// </summary>
-    public static List<string> NoTypeWordEx { get; private set; } = new();
-    /// <summary>
-    /// タイプ付き単語の情報
-    /// </summary>
-    public static Dictionary<string, List<WordType>> TypedWords { get; private set; } = new();
+    public static bool IsMaxHPModifiedOnSetUp { get; internal set; } = false;
     static readonly Task DictionaryImportTask;
     /// <summary>
     /// <see cref="Battle"/>クラスのインスタンスに追加で渡すハンドラーの情報
@@ -158,8 +154,12 @@ class Program
         {
             var (p1, p2) = SetUp();
             Console.WriteLine("辞書を読み込み中...\n\nしばらくお待ちください...");
+            p1.MaxHP = 40;
+            p1.ModifyMaxHP();
             DictionaryImportTask.Wait();
             battle = new Battle(p1, p2);
+            battle.Player1.Register(battle);
+            battle.Player2.Register(battle);
             battle.OnReset += Reset;
             battle.In = () => Console.ReadLine()?.Trim().Split() ?? Array.Empty<string>();
             battle.Out = Output;
@@ -491,18 +491,18 @@ class Program
         using var noTypeWordsReader = new StreamReader(NoTypeWordsPath);
         using var exNoTypeWordReader = new StreamReader(NoTypeWordExPath);
         var files = Directory.GetFiles(TypedWordsPath, "*", SearchOption.AllDirectories);
-        NoTypeWords = new();
-        NoTypeWordEx = new();
-        TypedWords = new();
+        SBDictionary.NoTypeWords = new();
+        SBDictionary.NoTypeWordEx = new();
+        SBDictionary.TypedWords = new();
         while (!noTypeWordsReader.EndOfStream)
         {
             var line = await noTypeWordsReader.ReadLineAsync() ?? string.Empty;
-            NoTypeWords.Add(line);
+            SBDictionary.NoTypeWords.Add(line);
         }
         while (!exNoTypeWordReader.EndOfStream)
         {
             var line = await exNoTypeWordReader.ReadLineAsync() ?? string.Empty;
-            NoTypeWordEx.Add(line);
+            SBDictionary.NoTypeWordEx.Add(line);
         }
         foreach (var file in files)
         {
@@ -511,8 +511,8 @@ class Program
             {
                 var line = await typedWordsReader.ReadLineAsync() ?? string.Empty;
                 var statedLine = line.Trim().Split();
-                if (statedLine.Length == 2) TypedWords.TryAdd(statedLine[0], new() { statedLine[1].StringToType() });
-                else if (statedLine.Length == 3) TypedWords.TryAdd(statedLine[0], new() { statedLine[1].StringToType(), statedLine[2].StringToType() });
+                if (statedLine.Length == 2) SBDictionary.TypedWords.TryAdd(statedLine[0], new() { statedLine[1].StringToType() });
+                else if (statedLine.Length == 3) SBDictionary.TypedWords.TryAdd(statedLine[0], new() { statedLine[1].StringToType(), statedLine[2].StringToType() });
             }
         }
     }
@@ -528,11 +528,32 @@ class Program
         {
             var NGNamesList = new[] { "p1", "p2", PLAYER1, PLAYER2 };
             string? p1Name, p2Name;
+            string? p1Type, p2Type;
+            bool isP1Human, isP2Human;
             const string DEFAULT_P1_NAME = "じぶん";
             const string DEFAULT_P2_NAME = "あいて";
-            ($"プレイヤーの名前を入力してください。(デフォルトでは「{DEFAULT_P1_NAME}」です)", Yellow).WriteLine();
+            ("プレイヤーの種類を入力してください。(人間 → hキー、コンピューター → cキーを入力)", Yellow).WriteLine();
+            p1Type = Console.ReadLine();
+            if (string.IsNullOrWhiteSpace(p1Type) || p1Type.ToUpper()[0] != 'C')
+            {
+                ("プレイヤーの種類を Human に設定しました。", Green).WriteLine();
+                isP1Human = true;
+            }
+            else
+            {
+                ("プレイヤーの種類を CPU に設定しました。", Green).WriteLine();
+                isP1Human = false;
+            }
+            if (isP1Human)
+                ($"プレイヤーの名前を入力してください。(デフォルトでは「{DEFAULT_P1_NAME}」です)", Yellow).WriteLine();
+            else
+                ($"CPUの名前を入力してください。（デフォルトでは「つよし」です）", Yellow).WriteLine();
             p1Name = Console.ReadLine();
-            if (string.IsNullOrEmpty(p1Name)) p1Name = DEFAULT_P1_NAME;
+            if (string.IsNullOrEmpty(p1Name)) 
+            {
+                if (isP1Human) p1Name = DEFAULT_P1_NAME;
+                else p1Name = "つよし";
+            }
             p1Name = p1Name.Trim();
             if (NGNamesList.Contains(p1Name))
             {
@@ -550,9 +571,28 @@ class Program
                     }
                 }
             ($"プレイヤーの名前を {p1Name} に設定しました。", Green).WriteLine();
-            ($"相手の名前を入力してください。(デフォルトでは「{DEFAULT_P2_NAME}」です)", Yellow).WriteLine();
+            ("相手の種類を入力してください。(人間 → hキー、コンピューター → cキーを入力)", Yellow).WriteLine();
+            p2Type = Console.ReadLine();
+            if (string.IsNullOrWhiteSpace(p2Type) || p2Type.ToUpper()[0] != 'C')
+            {
+                ("相手の種類を Human に設定しました。", Green).WriteLine();
+                isP2Human = true;
+            }
+            else
+            {
+                ("相手の種類を CPU に設定しました。", Green).WriteLine();
+                isP2Human = false;
+            }
+            if (isP2Human)
+                ($"相手の名前を入力してください。(デフォルトでは「{DEFAULT_P2_NAME}」です)", Yellow).WriteLine();
+            else
+                ($"CPUの名前を入力してください。（デフォルトでは「つよし」です）", Yellow).WriteLine();
             p2Name = Console.ReadLine();
-            if (string.IsNullOrEmpty(p2Name)) p2Name = DEFAULT_P2_NAME;
+            if (string.IsNullOrEmpty(p2Name))
+            {
+                if (isP2Human) p2Name = DEFAULT_P2_NAME;
+                else p2Name = "つよし";
+            }
             p2Name = p2Name.Trim();
             if (NGNamesList.Contains(p2Name) || p2Name.Contains(' '))
             {
@@ -570,16 +610,59 @@ class Program
                     }
                 }
             ($"相手の名前を {p2Name} に設定しました。", Green).WriteLine();
-            ("プレイヤーの初期特性を入力してください。(デフォルトではデバッガーになります)", Yellow).WriteLine();
-            var p1Abil = AbilityFactory.Create(Console.ReadLine() ?? "N") ?? new Debugger();
-            ($"{p1Name} の初期特性を {p1Abil.ToString()} に設定しました。", Green).WriteLine();
-            ("相手の初期特性を入力してください。(デフォルトではデバッガーになります)", Yellow).WriteLine();
-            var p2Abil = AbilityFactory.Create(Console.ReadLine() ?? "N") ?? new Debugger();
-            ($"{p2Name} の初期特性を {p2Abil.ToString()} に設定しました。", Green).WriteLine();
+            Ability? p1Abil, p2Abil;
+            CPUPlayer p1CPU = new Tsuyoshi();
+            CPUPlayer p2CPU = new Tsuyoshi();
+            if (isP1Human)
+            {
+                ("プレイヤーの初期特性を入力してください。(デフォルトではデバッガーになります)", Yellow).WriteLine();
+                p1Abil = AbilityFactory.Create(Console.ReadLine() ?? "N") ?? new Debugger();
+                ($"{p1Name} の初期特性を {p1Abil.ToString()} に設定しました。", Green).WriteLine();
+            }
+            else
+            {
+                p1CPU = CPUFactory.Create(p1Name) ?? new Tsuyoshi(p1Name, new Kakumei());
+                p1Abil = p1CPU.Ability;
+            }
+            if (isP2Human)
+            {
+                ("相手の初期特性を入力してください。(デフォルトではデバッガーになります)", Yellow).WriteLine();
+                p2Abil = AbilityFactory.Create(Console.ReadLine() ?? "N") ?? new Debugger();
+                ($"{p2Name} の初期特性を {p2Abil.ToString()} に設定しました。", Green).WriteLine();
+            }
+            else
+            {
+                p2CPU = CPUFactory.Create(p2Name) ?? new Tsuyoshi(p2Name, new Kakumei());
+                p2Abil = p2CPU.Ability;
+            }
+            int p1HP, p2HP;
+            if (isP1Human)
+            {
+                ("プレイヤーの最大HPを入力してください。(デフォルトでは60です)", Yellow).WriteLine();
+                p1HP = int.TryParse(Console.ReadLine(), out var HPtemp) ? HPtemp : 60;
+                ($"{p1Name} の最大HPを {p1HP} に設定しました。", Green).WriteLine();
+            }
+            else
+            {
+                p1HP = p1CPU.MaxHP;
+            }
+            if (isP2Human)
+            {
+                ("相手の最大HPを入力してください。(デフォルトでは60です)", Yellow).WriteLine();
+                p2HP = int.TryParse(Console.ReadLine(), out var HPtemp) ? HPtemp : 60;
+                ($"{p2Name} の最大HPを {p2HP} に設定しました。", Green).WriteLine();
+            }
+            else
+            {
+                p2HP = p2CPU.MaxHP;
+            }
+            ("続けるには任意のキーを入力してください. . . ", White).WriteLine();
+            Console.ReadLine();
+            Console.Clear();
             ("この設定でよろしいですか？", Yellow).WriteLine();
             Console.WriteLine();
-            ($"プレイヤーの名前: {p1Name}, プレイヤーの初期特性: {p1Abil.ToString()}", Cyan).WriteLine();
-            ($"相手の名前: {p2Name}, 相手の初期特性: {p2Abil.ToString()}", Cyan).WriteLine();
+            ($"プレイヤーの名前: {p1Name}, プレイヤーの初期特性: {p1Abil.ToString()}, プレイヤーの最大HP: {p1HP}", Cyan).WriteLine();
+            ($"相手の名前: {p2Name}, 相手の初期特性: {p2Abil.ToString()}, 相手の最大HP: {p2HP}", Cyan).WriteLine();
             Console.WriteLine();
             ("OK！ → 任意のキーを入力", Yellow).WriteLine();
             ("ダメ！ → r キーを入力", Yellow).WriteLine();
@@ -588,8 +671,11 @@ class Program
                 Console.Clear();
                 continue;
             }
-            p1 = new Player(p1Name, p1Abil);
-            p2 = new Player(p2Name, p2Abil);
+            p1 = isP1Human ? new Player(p1Name, p1Abil) : p1CPU;
+            p2 = isP2Human ? new Player(p2Name, p2Abil) : p2CPU;
+            if (isP1Human) p1.MaxHP = p1HP;
+            if (isP2Human) p2.MaxHP = p2HP;
+            IsMaxHPModifiedOnSetUp = p1HP != 60 || p2HP != 60;
             Console.Clear();
             break;
         }
@@ -819,7 +905,7 @@ class Program
             Warn();
             return;
         }
-        if (NoTypeWords.Contains(order[1]) || NoTypeWordEx.Contains(order[1]) || TypedWords.ContainsKey(order[1]))
+        if (SBDictionary.NoTypeWords.Contains(order[1]) || SBDictionary.NoTypeWordEx.Contains(order[1]) || SBDictionary.TypedWords.ContainsKey(order[1]))
         {
             Warn($"単語「{order[1]}」は既に辞書に含まれています。");
             return;
@@ -831,7 +917,7 @@ class Program
             return;
         }
         using var file = new StreamWriter(NoTypeWordExPath, true, Encoding.UTF8);
-        NoTypeWordEx.Add(order[1]);
+        SBDictionary.NoTypeWordEx.Add(order[1]);
         file.WriteLine(order[1]);
         window.Message.Append($"単語「{order[1]}」を辞書に追加しました。", Yellow);
     }
@@ -842,14 +928,14 @@ class Program
             Warn();
             return;
         }
-        if (!NoTypeWordEx.Contains(order[1]))
+        if (!SBDictionary.NoTypeWordEx.Contains(order[1]))
         {
             Warn($"単語「{order[1]}」は拡張辞書に含まれていません。");
             return;
         }
         using var file = new StreamWriter(NoTypeWordExPath, false, Encoding.UTF8);
-        NoTypeWordEx.Remove(order[1]);
-        foreach (var i in NoTypeWordEx)
+        SBDictionary.NoTypeWordEx.Remove(order[1]);
+        foreach (var i in SBDictionary.NoTypeWordEx)
             file.WriteLine(i);
         window.Message.Append($"単語「{order[1]}」を辞書から削除しました。", Yellow);
     }
@@ -1038,10 +1124,10 @@ class Program
         });
         var dic = dicOption switch
         {
-            1 => NoTypeWords,
-            2 => NoTypeWordEx,
-            3 => TypedWords.Keys.ToList(),
-            _ => NoTypeWords.Concat(NoTypeWordEx).Concat(TypedWords.Keys).ToList()
+            1 => SBDictionary.NoTypeWords,
+            2 => SBDictionary.NoTypeWordEx,
+            3 => SBDictionary.TypedWords.Keys.ToList(),
+            _ => SBDictionary.NoTypeWords.Concat(SBDictionary.NoTypeWordEx).Concat(SBDictionary.TypedWords.Keys).ToList()
         };
         if (name[0] == name[^1] && searchOption == 4)
             r = new Regex($"^{name[0]}\\w*{name[^1]}ー*$|^{name[0]}ー*$");

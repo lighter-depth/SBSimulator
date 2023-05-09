@@ -30,6 +30,10 @@ internal static class SBOptions
     /// カスタムとくせいが使用可能かどうかを表すフラグです。
     /// </summary>
     public static bool IsCustomAbilUsable { get; set; } = true;
+    /// <summary>
+    /// CPUの行動に待ち時間を設けるかを表すフラグです。
+    /// </summary>
+    public static bool IsCPUDelayEnabled { get; set; } = true;
     #endregion
 
     /// <summary>
