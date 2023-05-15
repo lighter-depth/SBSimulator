@@ -163,6 +163,12 @@ internal abstract class Contract
                 return false;
             }
         }
+        // NOTICE: コンピューターがワイルドカードに対応次第削除。
+        if (Word.LastChar.IsWild() && Receiver is CPUPlayer)
+        {
+            Message.Add("コンピューターとの戦闘では、最後の文字がワイルドカードである単語をサポートしません。", Notice.Warn);
+            return false;
+        }
         return true;
     }
     /// <summary>
@@ -231,7 +237,7 @@ internal abstract class Contract
         }
         if (Receiver.HP <= 0)
         {
-            Receiver.Kill();
+            Receiver.HP = 0;
             Message.Add($"{Actor.Name} は {Receiver.Name} を倒した！", Notice.DeathInfo);
             DeadFlag = true;
             return;

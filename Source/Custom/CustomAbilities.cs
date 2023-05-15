@@ -95,7 +95,7 @@ internal class Ganjou : CustomAbility
         if(c is not AttackContract ac) return;
         if(ac.Receiver.HP <= 0 && ac.Args.PreActor.HP == ac.Args.PreActor.MaxHP)
         {
-            ac.Receiver.Endure();
+            ac.Receiver.HP = 1;
             ac.Message.Add($"{ac.Receiver.Name} はこうげきをこらえた！", Notice.InvokeInfo);
         }
     }

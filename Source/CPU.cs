@@ -8,7 +8,7 @@ using System.Diagnostics.CodeAnalysis;
 namespace SBSimulator.Source;
 
 /// <summary>
-/// CPUがターンを先攻するかどうかを決定します。
+/// プレイヤーがターンを先攻するかどうかを決定します。
 /// </summary>
 internal enum TurnProceedingArbiter
 {
@@ -69,17 +69,23 @@ internal abstract class CPUPlayer : Player
     /// CPUの初期とくせい
     /// </summary>
     public virtual Ability FirstAbility => new Debugger();
-    /// <summary>
-    /// CPUが先攻するかどうか
-    /// </summary>
-    public virtual TurnProceedingArbiter Proceeding => TurnProceedingArbiter.Random;
-    static int _millisecondsDelay = 2000;
+    static int _millisecondsDelay = 1800;
     public CPUPlayer(string name, Ability ability) : base(name, ability) { }
     public CPUPlayer() : base() { }
+    /// <summary>
+    /// CPUの思考ルーチンを実行します。
+    /// </summary>
+    /// <returns><see cref="Battle"/>クラスへの命令を表す文字列</returns>
     public string[] Execute()
     {
-        if(IsCPUDelayEnabled) Task.Delay(_millisecondsDelay).Wait();
-        return Execute(0);
+        return Task.Run(executeAsync).GetAwaiter().GetResult();
+        async Task<string[]> executeAsync()
+        {
+            var timer = IsCPUDelayEnabled ? Task.Delay(_millisecondsDelay) : Task.Run(() => { });
+            var result = await Task.Run(() => Execute(0));
+            await timer;
+            return result;
+        }
     }
     /// <summary>
     /// CPUの思考ルーチンを実行します。
@@ -122,11 +128,6 @@ internal abstract class CPUPlayer : Player
             word = wordTemp;
             return true;
         }
-        return false;
-    }
-    public bool TryKillWordSearch(out Word word)
-    {
-        word = new();
         return false;
     }
     /// <summary>
@@ -183,7 +184,6 @@ internal class Itamae : CPUPlayer
     public override Ability FirstAbility => new Ikasui();
     public override string CPUName { get; set; } = "いたまえ";
     public override List<string> ReferedName => new() { "いたまえ", "s3", "S3" };
-    public override int MaxHP => 50;
     public override TurnProceedingArbiter Proceeding => TurnProceedingArbiter.True;
     public override string[] Execute(params int[] args)
     {
@@ -202,8 +202,7 @@ internal class Tsuyoshi : CPUPlayer
 {
     public override Ability FirstAbility => new Kakumei();
     public override string CPUName { get; set; } = "つよし";
-    public override List<string> ReferedName => new() { "つよし", "s11", "S11" };
-    public override int MaxHP => 40;
+    public override List<string> ReferedName => new() { "つよし", "s11", "S11", "sa", "SA" };
     public int ViolenceUsed { get; private set; } = 0;
     public bool PlayUsed { get; private set; } = false;
     public override TurnProceedingArbiter Proceeding => TurnProceedingArbiter.True;
@@ -244,6 +243,7 @@ internal class NuzemeAI : CPUPlayer
     {
         var startchar = GetStartChar();
         var word = GetLastWord();
+        /*
         if(word.Name == "ぬま" && Parent?.OtherPlayer.HP is <= 51)
         {
             return Ability is not Shinkoushin ? new[] { "change", "r" }
@@ -266,6 +266,8 @@ internal class NuzemeAI : CPUPlayer
         if (word.Name == "ぬし" && Parent?.OtherPlayer.HP is <= 34) return new[] { "しまかぜ" };
         if (word.Type1 == WordType.Empty && Parent?.OtherPlayer.HP is <= 20) return new[] { "ぬきうちてすと" };
         if (word.Name == "ぬー" && Parent?.OtherPlayer.HP is <= 34) return new[] { "ぬる" };
+        */
+
         if (TryWordSearchByName(x => x.Length > 6 && x[0] == startchar && x[^1] == 'ぬ', out var wordNuzeme7))
         {
             return new[] { wordNuzeme7.Name };

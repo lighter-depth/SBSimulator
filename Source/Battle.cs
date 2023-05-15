@@ -43,11 +43,11 @@ internal class Battle
     /// <summary>
     /// 入力処理を行うハンドラー
     /// </summary>
-    public Func<string[]> In = Array.Empty<string>;
+    public event Func<string[]>? In;
     /// <summary>
     /// 出力処理を行うハンドラー
     /// </summary>
-    public Action<List<AnnotatedString>> Out { get; set; } = (_) => { };
+    public event Action<List<AnnotatedString>>? Out;
     /// <summary>
     /// 出力する情報を保存するバッファー
     /// </summary>
@@ -56,7 +56,7 @@ internal class Battle
     /// <summary>
     /// リセット時の処理を行うハンドラー
     /// </summary>
-    public event Action<CancellationTokenSource> OnReset = delegate { };
+    public event Action<CancellationTokenSource>? OnReset;
     /// <summary>
     /// コマンド列とハンドラーを紐づける辞書
     /// </summary>
@@ -80,14 +80,19 @@ internal class Battle
     public void Run(Dictionary<string, Action<string[], CancellationTokenSource>> custom)
     {
         Initialize(custom);
-        Out(Buffer);
+        Out?.Invoke(Buffer);
         var cts = new CancellationTokenSource();
         while (!cts.IsCancellationRequested)
         {
             Buffer.Clear();
+
             // 入力処理、CPU かどうかを判定
-            var order = CurrentPlayer is not CPUPlayer cpu ? In() : cpu.Execute();
-            if (order.Length == 0 || string.IsNullOrWhiteSpace(order[0])) continue;
+            var order = CurrentPlayer is not CPUPlayer cpu ? In?.Invoke() : cpu.Execute();
+            if (order?.Length is 0 || string.IsNullOrWhiteSpace(order?[0])) 
+            {
+                Out?.Invoke(Buffer);
+                continue;
+            }
 
             // 辞書 OrderFunctions からコマンド名に合致するハンドラーを取り出す
             if (OrderFunctions.TryGetValue(order[0], out var func))
@@ -96,7 +101,7 @@ internal class Battle
                 OnDefault(order, cts);
 
             // 出力処理
-            Out(Buffer);
+            Out?.Invoke(Buffer);
 
         }
     }
@@ -108,7 +113,6 @@ internal class Battle
     private void Initialize(Dictionary<string, Action<string[], CancellationTokenSource>> custom)
     {
         IsPlayer1sTurn = InitIsP1sTurn();
-        if(!Program.IsMaxHPModifiedOnSetUp) SetMode(SBMode.Default);
         Buffer.Add($"{CurrentPlayer.Name} のターンです", Notice.General);
         Buffer.Add($"{Player1.Name}: {Player1.HP}/{Player1.MaxHP},     {Player2.Name}: {Player2.HP}/{Player2.MaxHP}", Notice.LogInfo);
         OrderFunctions = new()
@@ -127,10 +131,8 @@ internal class Battle
     private bool InitIsP1sTurn()
     {
         var randomFlag = new Random().Next(2) == 0;
-        var p1TPA = TurnProceedingArbiter.Random;
-        var p2TPA = TurnProceedingArbiter.Random;
-        if (Player1 is CPUPlayer cpu1) p1TPA = cpu1.Proceeding;
-        if (Player2 is CPUPlayer cpu2) p2TPA = cpu2.Proceeding;
+        var p1TPA = Player1.Proceeding;
+        var p2TPA = Player2.Proceeding;
         if (p1TPA == TurnProceedingArbiter.True && p1TPA == p2TPA) return randomFlag;
         if (p1TPA == TurnProceedingArbiter.False && p1TPA == p2TPA) return randomFlag;
         if (p1TPA == TurnProceedingArbiter.True) return true;
@@ -190,7 +192,11 @@ internal class Battle
         Buffer.AddMany(c.Message);
 
         // プレイヤーが死んだかどうかの判定、ターンの交代。
-        if (c.DeadFlag) OnReset(cts);
+        if (c.DeadFlag) 
+        {
+            Out?.Invoke(Buffer);
+            OnReset?.Invoke(cts); 
+        }
         if (c.IsBodyExecuted) ToggleTurn();
     }
 
@@ -316,7 +322,7 @@ internal class Battle
             return;
         }
         p.MaxHP = hp;
-        p.ModifyMaxHP();
+        p.HP = p.MaxHP;
         Buffer.Add($"{p.Name} の最大HPを {p.MaxHP} に設定しました。", Notice.SettingInfo);
     }
     private void OptionInfiniteSeed(string[] order)
@@ -538,81 +544,20 @@ internal class Battle
             Buffer.Add("入力が不正です。", Notice.Warn);
             return;
         }
-        var mode = order[2].StringToMode();
-        if (mode is SBMode.Empty)
+        var (mode, modeName) = ModeFactory.Create(order[2]);
+        if (mode is null)
         {
             Buffer.Add($"モード {order[2]} が見つかりません。", Notice.Warn);
             return;
         }
-        SetMode(mode);
-        Buffer.Add($"モードを {mode.ModeToString()} に設定しました。", Notice.SettingInfo);
+        mode.Set(this);
+        Buffer.Add($"モードを {modeName} に設定しました。", Notice.SettingInfo);
     }
     private void OptionDefault(string[] order)
     {
         Buffer.Add($"オプション {order[1]} が存在しないか、書式が不正です。", Notice.Warn);
     }
     #endregion
-
-    /// <summary>
-    /// 複数のオプションを一括で変更します。
-    /// </summary>
-    /// <param name="mode">変更先のモード名の指定</param>
-    private void SetMode(SBMode mode)
-    {
-        if (mode is SBMode.Default)
-        {
-            Player1.MaxHP = 60;
-            Player1.ModifyMaxHP();
-            Player2.MaxHP = 60;
-            Player2.ModifyMaxHP();
-            IsSeedInfinite = false;
-            IsCureInfinite = false;
-            IsAbilChangeable = true;
-            Player.MaxAbilChange = 3;
-            Player.MaxCureCount = 5;
-            Player.MaxFoodCount = 6;
-            Player.SeedDmg = 5;
-            Player.MaxSeedTurn = 4;
-            Player.CritDmg = 1.5;
-            Player.InsBufQty = 3;
-            return;
-        }
-        if (mode is SBMode.Classic)
-        {
-            Player1.MaxHP = 50;
-            Player1.ModifyMaxHP();
-            Player2.MaxHP = 50;
-            Player2.ModifyMaxHP();
-            IsSeedInfinite = true;
-            IsCureInfinite = true;
-            IsAbilChangeable = false;
-            Player.MaxAbilChange = 3;
-            Player.MaxCureCount = 5;
-            Player.MaxFoodCount = 6;
-            Player.SeedDmg = 5;
-            Player.MaxSeedTurn = 4;
-            Player.CritDmg = 1.5;
-            Player.InsBufQty = 3;
-            return;
-        }
-        if (mode is SBMode.AgeOfSeed)
-        {
-            Player1.MaxHP = 60;
-            Player1.ModifyMaxHP();
-            Player2.MaxHP = 60;
-            Player2.ModifyMaxHP();
-            IsSeedInfinite = true;
-            IsCureInfinite = false;
-            IsAbilChangeable = true;
-            Player.MaxAbilChange = 3;
-            Player.MaxCureCount = 5;
-            Player.MaxFoodCount = 6;
-            Player.SeedDmg = 5;
-            Player.MaxSeedTurn = 4;
-            Player.CritDmg = 1.5;
-            Player.InsBufQty = 3;
-        }
-    }
 
     /// <summary>
     /// 文字列のタイプを推論し、単語を出力します。

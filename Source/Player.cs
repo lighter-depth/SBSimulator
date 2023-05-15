@@ -13,7 +13,7 @@ internal class Player
     /// <summary>
     /// 名前
     /// </summary>
-    public string Name { get; set; } = "じぶん";
+    public string Name { get; internal set; } = "じぶん";
     /// <summary>
     /// 呼び出し元の<see cref="Battle"/>クラスの情報
     /// </summary>
@@ -22,7 +22,7 @@ internal class Player
     /// <summary>
     /// 残り体力
     /// </summary>
-    public int HP { get; private set; }
+    public int HP { get; internal set; }
 
     /// <summary>
     /// 攻撃力
@@ -52,7 +52,7 @@ internal class Player
     /// <summary>
     /// とくせいの情報
     /// </summary>
-    public Ability Ability { get; set; } = new Debugger();
+    public Ability Ability { get; internal set; } = new Debugger();
 
     /// <summary>
     /// 食べ物タイプの単語を使用した回数
@@ -68,6 +68,10 @@ internal class Player
     /// 状態異常の情報
     /// </summary>
     public PlayerState State { get; private set; } = PlayerState.Normal;
+    /// <summary>
+    /// プレイヤーが先攻するかどうか
+    /// </summary>
+    public virtual TurnProceedingArbiter Proceeding { get; internal set; } = TurnProceedingArbiter.Random;
 
     /// <summary>
     /// どく状態によるダメージ蓄積の値
@@ -77,7 +81,16 @@ internal class Player
     /// <summary>
     /// 最大体力の値
     /// </summary>
-    public virtual int MaxHP { get; set; } = 60;
+    public int MaxHP 
+    {
+        get => _maxHP;
+        set 
+        {
+            _maxHP = value;
+            HP = _maxHP;
+        } 
+    }
+    int _maxHP = 60;
 
     /// <summary>
     /// 使用した動物タイプの情報を保持するリスト
@@ -305,21 +318,6 @@ internal class Player
     }
 
     /// <summary>
-    /// プレイヤーの体力をゼロにします。
-    /// </summary>
-    public void Kill() => HP = 0;
-
-    /// <summary>
-    /// プレイヤーの体力を１にします。
-    /// </summary>
-    public void Endure() => HP = 1;
-
-    /// <summary>
-    /// プレイヤーの体力を最大体力と一致させます。
-    /// </summary>
-    public void ModifyMaxHP() => HP = MaxHP;
-
-    /// <summary>
     /// プレイヤーの攻撃力を変更します。
     /// </summary>
     /// <param name="arg">変更する攻撃力のインデックス値</param>
@@ -328,7 +326,7 @@ internal class Player
     public bool TryChangeATK(int arg, Word word)
     {
         var resultIndex = ATKIndex + arg;
-        if (resultIndex < 0 || ATKIndex == playerBufCap.Length - 1) return false;
+        if (resultIndex < 0 || resultIndex == playerBufCap.Length - 1) return false;
         else if (resultIndex >= playerBufCap.Length - 1) ATKIndex = playerBufCap.Length - 1;
         else ATKIndex = resultIndex;
         CurrentWord = word;
@@ -370,6 +368,7 @@ internal class Player
     /// とくせい「たいふういっか」を発動します。
     /// </summary>
     /// <param name="other">発動対象のプレイヤー</param>
+    /// <remarks>ある偉人は、民の前に立ちこう言った。「天で話にならねぇよ...」</remarks>
     public void WZ(Player other)
     {
         ATKIndex = 6;

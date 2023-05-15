@@ -1,11 +1,9 @@
-﻿#define BATTLE_TEST
-#undef BATTLE_TEST
-using System.Text;
-using static SBSimulator.Source.Word;
+﻿using System.Text;
 using static SBSimulator.Source.SBOptions;
 using static System.ConsoleColor;
 using System.Text.RegularExpressions;
-using Umayadia.Kana;
+using System.Runtime.CompilerServices;
+using System.Linq.Expressions;
 
 /*   ◆辞書について
  *   
@@ -59,12 +57,8 @@ using Umayadia.Kana;
 // TODO: ユーザー定義の無属性・有属性辞書の作成
 // TODO: オミット辞書の作成
 // TODO: 起動直後のパフォーマンス改善
-// TODO: 状態異常の埋め込み解消（PlayerState クラス作成）
-// TODO: モードの埋め込み解消 (SBMode クラス作成)
-// TODO: CPUに固有の初期設定の反映
-// TODO; ワイルドカード使用時にCPUがフリーズするバグの修正
+// TODO: 状態異常の埋め込み解消（PlayerState クラス作成?）
 // TODO: コマンドラインのオブジェクト化(SBOrder クラス作成)
-// TODO: CPUの単語検索のランダム化
 // TODO: 即死検索メソッドの実装
 
 namespace SBSimulator.Source;
@@ -72,8 +66,9 @@ namespace SBSimulator.Source;
 class Program
 {
     #region static fields
-    static readonly string Version = "v0.4.5";
+    static readonly string Version = "v0.4.8";
     static readonly Window window = new();
+    static Mode Mode = new();
     static Battle battle = new();
     static readonly string DicDir = GetDicPath();
     static readonly string NoTypeWordsPath = DicDir + @"\no type\no-type-words.csv";
@@ -154,17 +149,16 @@ class Program
         {
             var (p1, p2) = SetUp();
             Console.WriteLine("辞書を読み込み中...\n\nしばらくお待ちください...");
-            p1.MaxHP = 40;
-            p1.ModifyMaxHP();
             DictionaryImportTask.Wait();
             battle = new Battle(p1, p2);
             battle.Player1.Register(battle);
             battle.Player2.Register(battle);
+            Mode.Set(battle);
             battle.OnReset += Reset;
-            battle.In = () => Console.ReadLine()?.Trim().Split() ?? Array.Empty<string>();
-            battle.Out = Output;
+            battle.In += () => Console.ReadLine()?.Trim().Split() ?? Array.Empty<string>();
+            battle.Out += Output;
             battle.Run(CustomFunctions);
-            ExitApp();
+            OnExitApp();
         }
         catch (Exception exc)
         {
@@ -228,6 +222,7 @@ class Program
              + "・とくせいの入力法       → a キーを入力\n"
              + "・オプションの一覧       → o キーを入力\n"
              + "・キーワードの省略法     → k キーを入力\n"
+             + "・モードの設定方法       → m キーを入力\n"
              + "・ヘルプの終了           → q キーを入力\n"
              + "・アプリケーションの終了 → r キーを入力", Yellow).WriteLine();
 
@@ -401,12 +396,9 @@ class Program
                         Console.ReadLine();
                         Console.Clear();
                         ($"・{SET_MODE} オプション\n  複数のオプションをまとめて変更します。\n"
-                            + "  パラメーターにはモード名を指定できます。\n\n"
-                            + "  指定可能なモード名は以下の通りです。\n", Yellow).WriteLine();
-                        ($"・{DEFAULT_MODE} モード\n\n  現環境のモード。\n  体力上限６０、とくせい変更３回、医療５回、やどりぎ４ターン。\n\n"
-                            + $"・{CLASSIC_MODE} モード\n\n  旧環境のモード。\n  体力上限５０、とくせい変更ナシ、医療・やどりぎ無限。\n\n"
-                            + $"・{AOS_MODE} モード\n\n  やどりぎ環境のモード。\n  体力上限６０、とくせい変更３回、医療５回、やどりぎ無限。\n", Yellow).WriteLine();
+                            + "  パラメーターにはモード名を指定できます。\n", Yellow).WriteLine();
                         ($"(例): {OPTION} {SET_MODE} {CLASSIC_MODE}   → モードを {CLASSIC_MODE} に設定する\n", Cyan).WriteLine();
+                        ("設定可能なモードの一覧については、[ヘルプ] > [モードの設定方法] もご参照ください。\n", Yellow).WriteLine();
                         ("...続けるには任意のキーを押してください...", White).WriteLine();
                         Console.ReadLine();
                         break;
@@ -424,6 +416,38 @@ class Program
                        + $"{SET_INS_BUF_QTY}: sib  {SET_MODE}: sm  {STRICT}: s   {INFER}: i\n\n"
                        + $"{DEFAULT_MODE}: d   {CLASSIC_MODE}; c   {AOS_MODE}: s\n\n"
                        + $"{STATUS}: s     {OPTIONS}: o    {LOG}: l    {INFO}: i\n\n\n  ", Cyan).WriteLine();
+                        ("...続けるには任意のキーを押してください...", White).WriteLine();
+                        Console.ReadLine();
+                        break;
+                    }
+                case "m":
+                    {
+                        ("・モードの設定方法について\n", Yellow).WriteLine();
+                        ("モードとは、最大体力や医療制限の設定、先手後手の設定、やどりぎの設定など、\n"
+                      +  "複数のオプションを一括して管理する仕組みを表します。\n\n"
+                      + $"モードの設定・変更は、起動直後のモード設定、及び {OPTION} コマンドの {SET_MODE} パラメーターを\n"
+                      + "使用することで行うことができます。\n\n"
+                      + "設定可能なモードは以下の通りです。\n", Yellow).WriteLine();
+                        ("・ランダムマッチ系のモード\n", Yellow).WriteLine();
+                        ("ランダムマッチで使用可能・及び使用可能だったルールを再現したモードです。", Yellow).WriteLine();
+                        ("それぞれ、固有のシンボルを用いて参照します。\n", Yellow).WriteLine();
+                        ($"・{DEFAULT_MODE} モード\n  現環境のモード。体力上限６０、とくせい変更３回、医療５回、やどりぎ４ターン。", Yellow).WriteLine();
+                        ("  参照名: \"Default\", \"d\" など\n", Yellow).WriteLine();
+                        ($"・{CLASSIC_MODE} モード\n  旧環境のモード。体力上限５０、とくせい変更ナシ、医療・やどりぎ無限。", Yellow).WriteLine();
+                        ("  参照名: \"Classic\", \"c\" など\n", Yellow).WriteLine();
+                        ($"・{AOS_MODE} モード\n  やどりぎ環境のモード。体力上限６０、とくせい変更３回、医療５回、やどりぎ無限。", Yellow).WriteLine();
+                        ("  参照名: \"AgeOfSeed\", \"s\" など\n", Yellow).WriteLine();
+                        ("...続けるには任意のキーを押してください...", White).WriteLine();
+                        Console.ReadLine();
+                        Console.Clear();
+                        ("・ストーリー モード\n", Yellow).WriteLine();
+                        ("ストーリーに登場するステージの環境を再現したモードです。", Yellow).WriteLine();
+                        ("参照する際は、「StoryX」あるいは「sX」(Xはステージ番号)というようにして参照します。\n", Yellow).WriteLine();
+                        ($"(例): {OPTION} {SET_MODE} s11\n", Cyan).WriteLine();
+                        ("・カスタム モード\n", Yellow).WriteLine();
+                        ("起動直後のモード設定でのみ参照可能なモード名です。", Yellow).WriteLine();
+                        ("細かい設定を手動で調整することができます。\n", Yellow).WriteLine();
+                        ("参照名: \"Custom\", \"cs\"\n\n", Yellow).WriteLine();
                         ("...続けるには任意のキーを押してください...", White).WriteLine();
                         Console.ReadLine();
                         break;
@@ -522,200 +546,389 @@ class Program
     /// <returns>プレイヤーの初期情報</returns>
     static (Player, Player) SetUp()
     {
-        Player p1, p2;
         ("しりとりバトルシミュレーターへようこそ。", Yellow).WriteLine();
-        while (true)
+        ($"モードの名前を入力してください。(デフォルトでは{DEFAULT_MODE} モードになります)", Yellow).WriteLine();
+        var modeOrder = Console.ReadLine();
+        if (modeOrder?.ToUpper() is "CUSTOM" or "CS") return SetUpCustomMode();
+        var (mode, modeName) = ModeFactory.Create(modeOrder);
+        if (mode is null) (mode, modeName) = (new(), DEFAULT_MODE);
+        Mode = mode;
+        ($"モードを {modeName} に設定しました。", Green).WriteLine();
+        if (mode.IsStoryMode) return SetUpStoryMode();
+        return SetUpMatchMode();
+    }
+    #region setups
+    static (Player, Player) SetUpMatchMode()
+    {
+        Player? p1, p2;
+        var NGNamesList = new[] { "p1", "p2", PLAYER1, PLAYER2 };
+        string? p1Name, p2Name;
+        string? p1Type, p2Type;
+        bool isP1Human, isP2Human;
+        const string DEFAULT_P1_NAME = "じぶん";
+        const string DEFAULT_P2_NAME = "あいて";
+        ("プレイヤーの種類を入力してください。(人間 → hキー、コンピューター → cキーを入力)", Yellow).WriteLine();
+        p1Type = Console.ReadLine();
+        if (string.IsNullOrWhiteSpace(p1Type) || p1Type.ToUpper()[0] != 'C')
         {
-            var NGNamesList = new[] { "p1", "p2", PLAYER1, PLAYER2 };
-            string? p1Name, p2Name;
-            string? p1Type, p2Type;
-            bool isP1Human, isP2Human;
-            const string DEFAULT_P1_NAME = "じぶん";
-            const string DEFAULT_P2_NAME = "あいて";
-            ("プレイヤーの種類を入力してください。(人間 → hキー、コンピューター → cキーを入力)", Yellow).WriteLine();
-            p1Type = Console.ReadLine();
-            if (string.IsNullOrWhiteSpace(p1Type) || p1Type.ToUpper()[0] != 'C')
-            {
-                ("プレイヤーの種類を Human に設定しました。", Green).WriteLine();
-                isP1Human = true;
-            }
-            else
-            {
-                ("プレイヤーの種類を CPU に設定しました。", Green).WriteLine();
-                isP1Human = false;
-            }
-            if (isP1Human)
-                ($"プレイヤーの名前を入力してください。(デフォルトでは「{DEFAULT_P1_NAME}」です)", Yellow).WriteLine();
-            else
-                ($"CPUの名前を入力してください。（デフォルトでは「つよし」です）", Yellow).WriteLine();
-            p1Name = Console.ReadLine();
-            if (string.IsNullOrEmpty(p1Name)) 
-            {
-                if (isP1Human) p1Name = DEFAULT_P1_NAME;
-                else p1Name = "つよし";
-            }
-            p1Name = p1Name.Trim();
-            if (NGNamesList.Contains(p1Name))
-            {
-                ($"名前{p1Name} は使用できません。", Red).WriteLine();
-                p1Name = DEFAULT_P1_NAME;
-            }
-            else
-                foreach (char c in p1Name)
-                {
-                    if (char.IsWhiteSpace(c))
-                    {
-                        ($"名前{p1Name} は空白を含むため使用できません。", Red).WriteLine();
-                        p1Name = DEFAULT_P1_NAME;
-                        break;
-                    }
-                }
-            ($"プレイヤーの名前を {p1Name} に設定しました。", Green).WriteLine();
-            ("相手の種類を入力してください。(人間 → hキー、コンピューター → cキーを入力)", Yellow).WriteLine();
-            p2Type = Console.ReadLine();
-            if (string.IsNullOrWhiteSpace(p2Type) || p2Type.ToUpper()[0] != 'C')
-            {
-                ("相手の種類を Human に設定しました。", Green).WriteLine();
-                isP2Human = true;
-            }
-            else
-            {
-                ("相手の種類を CPU に設定しました。", Green).WriteLine();
-                isP2Human = false;
-            }
-            if (isP2Human)
-                ($"相手の名前を入力してください。(デフォルトでは「{DEFAULT_P2_NAME}」です)", Yellow).WriteLine();
-            else
-                ($"CPUの名前を入力してください。（デフォルトでは「つよし」です）", Yellow).WriteLine();
-            p2Name = Console.ReadLine();
-            if (string.IsNullOrEmpty(p2Name))
-            {
-                if (isP2Human) p2Name = DEFAULT_P2_NAME;
-                else p2Name = "つよし";
-            }
-            p2Name = p2Name.Trim();
-            if (NGNamesList.Contains(p2Name) || p2Name.Contains(' '))
-            {
-                ($"名前{p2Name} は使用できません。", Red).WriteLine();
-                p2Name = DEFAULT_P2_NAME;
-            }
-            else
-                foreach (char c in p2Name)
-                {
-                    if (char.IsWhiteSpace(c))
-                    {
-                        ($"名前{p2Name} は空白を含むため使用できません。", Red).WriteLine();
-                        p2Name = DEFAULT_P2_NAME;
-                        break;
-                    }
-                }
-            ($"相手の名前を {p2Name} に設定しました。", Green).WriteLine();
-            Ability? p1Abil, p2Abil;
-            CPUPlayer p1CPU = new Tsuyoshi();
-            CPUPlayer p2CPU = new Tsuyoshi();
-            if (isP1Human)
-            {
-                ("プレイヤーの初期特性を入力してください。(デフォルトではデバッガーになります)", Yellow).WriteLine();
-                p1Abil = AbilityFactory.Create(Console.ReadLine() ?? "N") ?? new Debugger();
-                ($"{p1Name} の初期特性を {p1Abil.ToString()} に設定しました。", Green).WriteLine();
-            }
-            else
-            {
-                p1CPU = CPUFactory.Create(p1Name) ?? new Tsuyoshi(p1Name, new Kakumei());
-                p1Abil = p1CPU.Ability;
-            }
-            if (isP2Human)
-            {
-                ("相手の初期特性を入力してください。(デフォルトではデバッガーになります)", Yellow).WriteLine();
-                p2Abil = AbilityFactory.Create(Console.ReadLine() ?? "N") ?? new Debugger();
-                ($"{p2Name} の初期特性を {p2Abil.ToString()} に設定しました。", Green).WriteLine();
-            }
-            else
-            {
-                p2CPU = CPUFactory.Create(p2Name) ?? new Tsuyoshi(p2Name, new Kakumei());
-                p2Abil = p2CPU.Ability;
-            }
-            int p1HP, p2HP;
-            if (isP1Human)
-            {
-                ("プレイヤーの最大HPを入力してください。(デフォルトでは60です)", Yellow).WriteLine();
-                p1HP = int.TryParse(Console.ReadLine(), out var HPtemp) ? HPtemp : 60;
-                ($"{p1Name} の最大HPを {p1HP} に設定しました。", Green).WriteLine();
-            }
-            else
-            {
-                p1HP = p1CPU.MaxHP;
-            }
-            if (isP2Human)
-            {
-                ("相手の最大HPを入力してください。(デフォルトでは60です)", Yellow).WriteLine();
-                p2HP = int.TryParse(Console.ReadLine(), out var HPtemp) ? HPtemp : 60;
-                ($"{p2Name} の最大HPを {p2HP} に設定しました。", Green).WriteLine();
-            }
-            else
-            {
-                p2HP = p2CPU.MaxHP;
-            }
-            ("続けるには任意のキーを入力してください. . . ", White).WriteLine();
-            Console.ReadLine();
-            Console.Clear();
-            ("この設定でよろしいですか？", Yellow).WriteLine();
-            Console.WriteLine();
-            ($"プレイヤーの名前: {p1Name}, プレイヤーの初期特性: {p1Abil.ToString()}, プレイヤーの最大HP: {p1HP}", Cyan).WriteLine();
-            ($"相手の名前: {p2Name}, 相手の初期特性: {p2Abil.ToString()}, 相手の最大HP: {p2HP}", Cyan).WriteLine();
-            Console.WriteLine();
-            ("OK！ → 任意のキーを入力", Yellow).WriteLine();
-            ("ダメ！ → r キーを入力", Yellow).WriteLine();
-            if (Console.ReadLine() == "r")
-            {
-                Console.Clear();
-                continue;
-            }
-            p1 = isP1Human ? new Player(p1Name, p1Abil) : p1CPU;
-            p2 = isP2Human ? new Player(p2Name, p2Abil) : p2CPU;
-            if (isP1Human) p1.MaxHP = p1HP;
-            if (isP2Human) p2.MaxHP = p2HP;
-            IsMaxHPModifiedOnSetUp = p1HP != 60 || p2HP != 60;
-            Console.Clear();
-            break;
+            ("プレイヤーの種類を Human に設定しました。", Green).WriteLine();
+            isP1Human = true;
         }
+        else
+        {
+            ("プレイヤーの種類を CPU に設定しました。", Green).WriteLine();
+            isP1Human = false;
+        }
+        if (isP1Human)
+            ($"プレイヤーの名前を入力してください。(デフォルトでは「{DEFAULT_P1_NAME}」です)", Yellow).WriteLine();
+        else
+            ($"CPUの名前を入力してください。（デフォルトでは「つよし」です）", Yellow).WriteLine();
+        p1Name = Console.ReadLine();
+        if (string.IsNullOrEmpty(p1Name))
+        {
+            if (isP1Human) p1Name = DEFAULT_P1_NAME;
+            else p1Name = "つよし";
+        }
+        p1Name = p1Name.Trim();
+        if (NGNamesList.Contains(p1Name))
+        {
+            ($"名前{p1Name} は使用できません。", Red).WriteLine();
+            p1Name = DEFAULT_P1_NAME;
+        }
+        else
+            foreach (char c in p1Name)
+            {
+                if (char.IsWhiteSpace(c))
+                {
+                    ($"名前{p1Name} は空白を含むため使用できません。", Red).WriteLine();
+                    p1Name = DEFAULT_P1_NAME;
+                    break;
+                }
+            }
+        ($"プレイヤーの名前を {p1Name} に設定しました。", Green).WriteLine();
+        ("相手の種類を入力してください。(人間 → hキー、コンピューター → cキーを入力)", Yellow).WriteLine();
+        p2Type = Console.ReadLine();
+        if (string.IsNullOrWhiteSpace(p2Type) || p2Type.ToUpper()[0] != 'C')
+        {
+            ("相手の種類を Human に設定しました。", Green).WriteLine();
+            isP2Human = true;
+        }
+        else
+        {
+            ("相手の種類を CPU に設定しました。", Green).WriteLine();
+            isP2Human = false;
+        }
+        if (isP2Human)
+            ($"相手の名前を入力してください。(デフォルトでは「{DEFAULT_P2_NAME}」です)", Yellow).WriteLine();
+        else
+            ($"CPUの名前を入力してください。（デフォルトでは「つよし」です）", Yellow).WriteLine();
+        p2Name = Console.ReadLine();
+        if (string.IsNullOrEmpty(p2Name))
+        {
+            if (isP2Human) p2Name = DEFAULT_P2_NAME;
+            else p2Name = "つよし";
+        }
+        p2Name = p2Name.Trim();
+        if (NGNamesList.Contains(p2Name) || p2Name.Contains(' '))
+        {
+            ($"名前{p2Name} は使用できません。", Red).WriteLine();
+            p2Name = DEFAULT_P2_NAME;
+        }
+        else
+            foreach (char c in p2Name)
+            {
+                if (char.IsWhiteSpace(c))
+                {
+                    ($"名前{p2Name} は空白を含むため使用できません。", Red).WriteLine();
+                    p2Name = DEFAULT_P2_NAME;
+                    break;
+                }
+            }
+        ($"相手の名前を {p2Name} に設定しました。", Green).WriteLine();
+        Ability? p1Abil, p2Abil;
+        CPUPlayer p1CPU = new Tsuyoshi();
+        CPUPlayer p2CPU = new Tsuyoshi();
+        if (isP1Human)
+        {
+            ("プレイヤーの初期特性を入力してください。(デフォルトではデバッガーになります)", Yellow).WriteLine();
+            p1Abil = AbilityFactory.Create(Console.ReadLine() ?? "N") ?? new Debugger();
+            ($"{p1Name} の初期特性を {p1Abil.ToString()} に設定しました。", Green).WriteLine();
+        }
+        else
+        {
+            p1CPU = CPUFactory.Create(p1Name) ?? new Tsuyoshi(p1Name, new Kakumei());
+            p1Abil = p1CPU.Ability;
+        }
+        if (isP2Human)
+        {
+            ("相手の初期特性を入力してください。(デフォルトではデバッガーになります)", Yellow).WriteLine();
+            p2Abil = AbilityFactory.Create(Console.ReadLine() ?? "N") ?? new Debugger();
+            ($"{p2Name} の初期特性を {p2Abil.ToString()} に設定しました。", Green).WriteLine();
+        }
+        else
+        {
+            p2CPU = CPUFactory.Create(p2Name) ?? new Tsuyoshi(p2Name, new Kakumei());
+            p2Abil = p2CPU.Ability;
+        }
+        ("続けるには任意のキーを入力してください. . . ", White).WriteLine();
+        Console.ReadLine();
+        Console.Clear();
+        ("以下の設定で開始します。", Yellow).WriteLine();
+        Console.WriteLine();
+        var p1NameResult = isP1Human ? p1Name : p1CPU.Name;
+        var p2NameResult = isP2Human ? p2Name : p2CPU.Name;
+        ($"プレイヤーの名前: {p1NameResult}, プレイヤーの初期特性: {p1Abil.ToString()}", Cyan).WriteLine();
+        ($"相手の名前: {p2NameResult}, 相手の初期特性: {p2Abil.ToString()}", Cyan).WriteLine();
+        Console.WriteLine();
+        ("開始するには任意のキーを入力してください. . . ", Yellow).WriteLine();
+        Console.ReadLine();
+        p1 = isP1Human ? new Player(p1Name, p1Abil) : p1CPU;
+        p2 = isP2Human ? new Player(p2Name, p2Abil) : p2CPU;
+        Console.Clear();
         return (p1, p2);
     }
+    static (Player, Player) SetUpStoryMode()
+    {
+        Player? p1, p2;
+        var NGNamesList = new[] { "p1", "p2", PLAYER1, PLAYER2 };
+        string? p1Name, p2Name;
+        const string DEFAULT_P1_NAME = "じぶん";
+        ($"プレイヤーの名前を入力してください。(デフォルトでは「{DEFAULT_P1_NAME}」です)", Yellow).WriteLine();
+        p1Name = Console.ReadLine();
+        if (string.IsNullOrEmpty(p1Name)) p1Name = DEFAULT_P1_NAME;
+        p1Name = p1Name.Trim();
+        if (NGNamesList.Contains(p1Name))
+        {
+            ($"名前{p1Name} は使用できません。", Red).WriteLine();
+            p1Name = DEFAULT_P1_NAME;
+        }
+        else
+            foreach (char c in p1Name)
+            {
+                if (char.IsWhiteSpace(c))
+                {
+                    ($"名前{p1Name} は空白を含むため使用できません。", Red).WriteLine();
+                    p1Name = DEFAULT_P1_NAME;
+                    break;
+                }
+            }
+        p2Name = Mode.StoryName;
+        ($"プレイヤーの名前を {p1Name} に設定しました。", Green).WriteLine();
+        Ability? p1Abil, p2Abil;
+        CPUPlayer? p2CPU;
+        ("プレイヤーの初期特性を入力してください。(デフォルトではデバッガーになります)", Yellow).WriteLine();
+        p1Abil = AbilityFactory.Create(Console.ReadLine() ?? "N") ?? new Debugger();
+        ($"{p1Name} の初期特性を {p1Abil.ToString()} に設定しました。", Green).WriteLine();
+        p2CPU = CPUFactory.Create(p2Name) ?? new Tsuyoshi(p2Name, new Kakumei());
+        p2Abil = p2CPU.FirstAbility;
+        ("以下の設定で開始します。", Yellow).WriteLine();
+        Console.WriteLine();
+        ($"プレイヤーの名前: {p1Name}, プレイヤーの初期特性: {p1Abil.ToString()}", Cyan).WriteLine();
+        ($"相手の名前: {p2Name}, 相手の初期特性: {p2Abil.ToString()}", Cyan).WriteLine();
+        Console.WriteLine();
+        ("開始するには任意のキーを入力してください. . . ", Yellow).WriteLine();
+        Console.ReadLine();
+        p1 = new Player(p1Name, p1Abil);
+        p2 = p2CPU;
+        Console.Clear();
+        return (p1, p2);
+    }
+    static (Player, Player) SetUpCustomMode()
+    {
+        ($"モードを カスタム に設定しました。", Green).WriteLine();
+        Player? p1, p2;
+        var NGNamesList = new[] { "p1", "p2", PLAYER1, PLAYER2 };
+        string? p1Name, p2Name;
+        string? p1Type, p2Type;
+        bool isP1Human, isP2Human;
+        const string DEFAULT_P1_NAME = "じぶん";
+        const string DEFAULT_P2_NAME = "あいて";
+        ("プレイヤーの種類を入力してください。(人間 → hキー、コンピューター → cキーを入力)", Yellow).WriteLine();
+        p1Type = Console.ReadLine();
+        if (string.IsNullOrWhiteSpace(p1Type) || p1Type.ToUpper()[0] != 'C')
+        {
+            ("プレイヤーの種類を Human に設定しました。", Green).WriteLine();
+            isP1Human = true;
+        }
+        else
+        {
+            ("プレイヤーの種類を CPU に設定しました。", Green).WriteLine();
+            isP1Human = false;
+        }
+        if (isP1Human)
+            ($"プレイヤーの名前を入力してください。(デフォルトでは「{DEFAULT_P1_NAME}」です)", Yellow).WriteLine();
+        else
+            ($"CPUの名前を入力してください。（デフォルトでは「つよし」です）", Yellow).WriteLine();
+        p1Name = Console.ReadLine();
+        if (string.IsNullOrEmpty(p1Name))
+        {
+            if (isP1Human) p1Name = DEFAULT_P1_NAME;
+            else p1Name = "つよし";
+        }
+        p1Name = p1Name.Trim();
+        if (NGNamesList.Contains(p1Name))
+        {
+            ($"名前{p1Name} は使用できません。", Red).WriteLine();
+            p1Name = DEFAULT_P1_NAME;
+        }
+        else
+            foreach (char c in p1Name)
+            {
+                if (char.IsWhiteSpace(c))
+                {
+                    ($"名前{p1Name} は空白を含むため使用できません。", Red).WriteLine();
+                    p1Name = DEFAULT_P1_NAME;
+                    break;
+                }
+            }
+        ($"プレイヤーの名前を {p1Name} に設定しました。", Green).WriteLine();
+        ("相手の種類を入力してください。(人間 → hキー、コンピューター → cキーを入力)", Yellow).WriteLine();
+        p2Type = Console.ReadLine();
+        if (string.IsNullOrWhiteSpace(p2Type) || p2Type.ToUpper()[0] != 'C')
+        {
+            ("相手の種類を Human に設定しました。", Green).WriteLine();
+            isP2Human = true;
+        }
+        else
+        {
+            ("相手の種類を CPU に設定しました。", Green).WriteLine();
+            isP2Human = false;
+        }
+        if (isP2Human)
+            ($"相手の名前を入力してください。(デフォルトでは「{DEFAULT_P2_NAME}」です)", Yellow).WriteLine();
+        else
+            ($"CPUの名前を入力してください。（デフォルトでは「つよし」です）", Yellow).WriteLine();
+        p2Name = Console.ReadLine();
+        if (string.IsNullOrEmpty(p2Name))
+        {
+            if (isP2Human) p2Name = DEFAULT_P2_NAME;
+            else p2Name = "つよし";
+        }
+        p2Name = p2Name.Trim();
+        if (NGNamesList.Contains(p2Name) || p2Name.Contains(' '))
+        {
+            ($"名前{p2Name} は使用できません。", Red).WriteLine();
+            p2Name = DEFAULT_P2_NAME;
+        }
+        else
+            foreach (char c in p2Name)
+            {
+                if (char.IsWhiteSpace(c))
+                {
+                    ($"名前{p2Name} は空白を含むため使用できません。", Red).WriteLine();
+                    p2Name = DEFAULT_P2_NAME;
+                    break;
+                }
+            }
+        ($"相手の名前を {p2Name} に設定しました。", Green).WriteLine();
+        Ability? p1Abil, p2Abil;
+        CPUPlayer p1CPU = new Tsuyoshi();
+        CPUPlayer p2CPU = new Tsuyoshi();
+        if (isP1Human)
+        {
+            ("プレイヤーの初期特性を入力してください。(デフォルトではデバッガーになります)", Yellow).WriteLine();
+            p1Abil = AbilityFactory.Create(Console.ReadLine() ?? "N") ?? new Debugger();
+            ($"{p1Name} の初期特性を {p1Abil.ToString()} に設定しました。", Green).WriteLine();
+        }
+        else
+        {
+            p1CPU = CPUFactory.Create(p1Name) ?? new Tsuyoshi(p1Name, new Kakumei());
+            p1Abil = p1CPU.Ability;
+        }
+        if (isP2Human)
+        {
+            ("相手の初期特性を入力してください。(デフォルトではデバッガーになります)", Yellow).WriteLine();
+            p2Abil = AbilityFactory.Create(Console.ReadLine() ?? "N") ?? new Debugger();
+            ($"{p2Name} の初期特性を {p2Abil.ToString()} に設定しました。", Green).WriteLine();
+        }
+        else
+        {
+            p2CPU = CPUFactory.Create(p2Name) ?? new Tsuyoshi(p2Name, new Kakumei());
+            p2Abil = p2CPU.Ability;
+        }
+        ("続けるには任意のキーを入力してください. . . ", White).WriteLine();
+        Console.ReadLine();
+        Console.Clear();
+        int p1HP, p2HP;
+        ("プレイヤーの最大HPを入力してください。(デフォルトでは60です)", Yellow).WriteLine();
+        p1HP = int.TryParse(Console.ReadLine(), out p1HP) ? p1HP : 60;
+        ($"{p1Name} の最大HPを {p1HP} に設定しました。", Green).WriteLine();
+        ("相手の最大HPを入力してください。(デフォルトでは60です)", Yellow).WriteLine();
+        p2HP = int.TryParse(Console.ReadLine(), out p2HP) ? p2HP : 60;
+        ($"{p2Name} の最大HPを {p2HP} に設定しました。", Green).WriteLine();
+        ("「やどりぎの永続」設定を有効にする場合は e キーを入力してください。", Yellow).WriteLine();
+        var isSeedInfinite = Console.ReadLine() is "e";
+        ("「やどりぎの永続」設定を" + (isSeedInfinite ? "有効" : "無効") + "に設定しました。", Green).WriteLine();
+        ("「医療の使用回数無限」設定を有効にする場合は e キーを入力してください。", Yellow).WriteLine();
+        var isCureInfinite = Console.ReadLine() is "e";
+        ("「医療の使用回数無限」設定を" + (isCureInfinite ? "有効" : "無効") + "に設定しました。", Green).WriteLine();
+        ("「変更可能な特性」設定を有効にする場合は e キーを入力してください。", Yellow).WriteLine();
+        var isAbilChangeable = Console.ReadLine() is "e";
+        ("「変更可能な特性」設定を" + (isAbilChangeable ? "有効" : "無効") + "に設定しました。", Green).WriteLine();
+        ("続けるには任意のキーを入力してください. . . ", White).WriteLine();
+        Console.ReadLine();
+        Console.Clear();
+        ("この設定でよろしいですか？", Yellow).WriteLine();
+        Console.WriteLine();
+        var p1NameResult = isP1Human ? p1Name : p1CPU.Name;
+        var p2NameResult = isP2Human ? p2Name : p2CPU.Name;
+        ($"プレイヤーの名前: {p1NameResult}, プレイヤーの初期特性: {p1Abil.ToString()}, プレイヤーの最大HP: {p1HP}", Cyan).WriteLine();
+        ($"相手の名前: {p2NameResult}, 相手の初期特性: {p2Abil.ToString()}, 相手の最大HP: {p2HP}", Cyan).WriteLine();
+        ("\nやどりぎの永続: " + (isSeedInfinite ? "有効" : "無効"), Cyan).WriteLine();
+        ("医療の使用回数無限: " + (isCureInfinite ? "有効" : "無効"), Cyan).WriteLine();
+        ("変更可能な特性: " + (isAbilChangeable ? "有効" : "無効\n\n"), Cyan).WriteLine();
+        ("続けるには任意のキーを入力してください. . . ", White).WriteLine();
+        Console.ReadLine();
+        Console.Clear();
+        Console.WriteLine();
+        ("OK！ → 任意のキーを入力", Yellow).WriteLine();
+        p1 = isP1Human ? new Player(p1Name, p1Abil) : p1CPU;
+        p2 = isP2Human ? new Player(p2Name, p2Abil) : p2CPU;
+        Mode = new Mode(p1HP, p2HP, isSeedInfinite, isCureInfinite, isAbilChangeable);
+        Console.Clear();
+        return (p1, p2);
+    }
+    #endregion
     /// <summary>
     /// <see cref="Battle.OnReset"/>に渡すハンドラーです。
     /// </summary>
     static void Reset(CancellationTokenSource cts)
     {
         window.Message.Append("やり直す？", Yellow);
-        window.Message.Append("\n");
-        window.Message.Append("やり直す！ → 任意のキーを入力", Yellow);
+        window.Message.Append(string.Empty);
+        window.Message.Append("やり直す！ → r キーを入力", Yellow);
         window.Message.Append("ログを表示 → l キーを入力", Yellow);
-        window.Message.Append("もうやめる！ → r キーを入力", Yellow);
-        Refresh();
-        window.WriteLine();
-        var order = Console.ReadLine() ?? string.Empty;
-        if (order == "r")
+        window.Message.Append("もうやめる！ → q キーを入力", Yellow);
+        while (true)
         {
-            cts.Cancel();
-            Console.Clear();
-            return;
-        }
-        else if (order == "l")
-        {
-            cts.Cancel();
-            ShowLog();
-            Console.Clear();
-            window.Message.Clear();
-            window.Message.Log.Clear();
-            Main();
-        }
-        else
-        {
-            cts.Cancel();
-            Console.Clear();
-            window.Message.Clear();
-            window.Message.Log.Clear();
-            Main();
+            Refresh();
+            window.WriteLine();
+            var order = Console.ReadLine() ?? string.Empty;
+            if (order == "q")
+            {
+                cts.Cancel();
+                Console.Clear();
+                return;
+            }
+            else if (order == "l")
+            {
+                cts.Cancel();
+                ShowLog();
+                Console.Clear();
+                window.Message.Clear();
+                window.Message.Log.Clear();
+                Main();
+                break;
+            }
+            else if (order == "r")
+            {
+                cts.Cancel();
+                Console.Clear();
+                window.Message.Clear();
+                window.Message.Log.Clear();
+                Main();
+                break;
+            }
         }
     }
     /// <summary>
@@ -888,7 +1101,7 @@ class Program
     /// <summary>
     /// アプリケーションを終了時の処理を行います。
     /// </summary>
-    static void ExitApp()
+    static void OnExitApp()
     {
         Console.Clear();
         ("アプリケーションを終了します。任意のキーを押してください. . .", Yellow).WriteLine();
@@ -898,6 +1111,9 @@ class Program
 
     // WARNING: デバッグ用　使うな！
     #region DEBUG
+    /// <summary>
+    /// 拡張無属性辞書に単語を追加します。
+    /// </summary>
     static void __OnAddOrdered(string[] order, CancellationTokenSource cts)
     {
         if (order.Length != 2)
@@ -921,6 +1137,11 @@ class Program
         file.WriteLine(order[1]);
         window.Message.Append($"単語「{order[1]}」を辞書に追加しました。", Yellow);
     }
+    /// <summary>
+    /// 拡張無属性辞書から単語を削除します。
+    /// </summary>
+    /// <param name="order"></param>
+    /// <param name="cts"></param>
     static void __OnRemoveOrdered(string[] order, CancellationTokenSource cts)
     {
         if (order.Length != 2)
@@ -939,6 +1160,11 @@ class Program
             file.WriteLine(i);
         window.Message.Append($"単語「{order[1]}」を辞書から削除しました。", Yellow);
     }
+    /// <summary>
+    /// ワードサーチモードを起動します。
+    /// </summary>
+    /// <param name="order"></param>
+    /// <param name="cts"></param>
     static void __OnSearchOrdered(string[] order, CancellationTokenSource cts)
     {
         var searchMsg = new MessageBox();
@@ -987,6 +1213,8 @@ class Program
             }
             Console.Clear();
             ("ワードサーチモード\n", White).WriteLine();
+            ("\n検索条件: ", Yellow).Write();
+            (string.Join(" ", orderSearchLog), Cyan).WriteLine();
             ("\nマッチする単語を探しています. . . \n", Yellow).WriteLine();
             if (!__TrySearch(cond, searchOption, dicOption, out var words))
             {
@@ -1107,6 +1335,14 @@ class Program
     }
 
     // FIXME: 「ゔ」のサーチがうまくいかない。（「\u3094」でマッチすればうまくいく）
+    /// <summary>
+    /// 単語の検索を行います。
+    /// </summary>
+    /// <param name="name">単語の名前を表す<see cref="string"/></param>
+    /// <param name="searchOption">検索のオプション</param>
+    /// <param name="dicOption">辞書のオプション</param>
+    /// <param name="words">検索条件にマッチする文字列のリスト</param>
+    /// <returns>検索が成功したかどうかを表すフラグ</returns>
     static bool __TrySearch(string name, int searchOption, int dicOption, out List<string> words)
     {
         bool result = false;
@@ -1142,14 +1378,26 @@ class Program
         words = words.Distinct().ToList();
         return result;
     }
+    /// <summary>
+    /// 例外を発生させ、アプリケーションを終了させます。
+    /// </summary>
     static void __OnErrorOrdered(string[] order, CancellationTokenSource cts)
     {
         __Error();
     }
+    /// <summary>
+    /// 例外発生操作を実行します。
+    /// </summary>
     static void __Error()
     {
         Console.WriteLine((new int[6])[9]);
     }
+    /// <summary>
+    /// 文字列を検索オプションに変換します。
+    /// </summary>
+    /// <param name="str">変換する<see cref="string"/></param>
+    /// <param name="option">変換された検索オプションを表す<see cref="int"/></param>
+    /// <returns>変換が成功したかどうかを表すフラグ</returns>
     static bool __TryStringToSearchOption(string str, out int option)
     {
         (var result, option) = str switch
@@ -1165,6 +1413,12 @@ class Program
         };
         return result;
     }
+    /// <summary>
+    /// 文字列を辞書オプションに変換します。
+    /// </summary>
+    /// <param name="str">変換する<see cref="string"/></param>
+    /// <param name="option">変換された辞書オプションを表す<see cref="int"/></param>
+    /// <returns>変換が成功したかどうかを表すフラグ</returns>
     static bool __TryStringToDicOption(string str, out int option)
     {
         (var result, option) = str switch

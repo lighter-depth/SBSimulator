@@ -108,14 +108,6 @@ class MessageBox
         Append(new ColoredString(text, color));
     }
     /// <summary>
-    /// <see cref="Content"/>に複数の要素を追加します。
-    /// </summary>
-    public void AppendMany(IEnumerable<ColoredString> items)
-    {
-        foreach(var i in items)
-            Append(i);
-    }
-    /// <summary>
     /// <see cref="Content"/>の中身を空にします。
     /// </summary>
     public void Clear()
@@ -152,13 +144,6 @@ class MessageLog
     public void Append(ColoredString s)
     {
         Content.Add(s);
-    }
-    /// <summary>
-    /// <see cref="Content"/>の末尾に要素を追加します。
-    /// </summary>
-    public void Append(string text, ConsoleColor color)
-    {
-        Append(new ColoredString(text, color));
     }
     /// <summary>
     /// <see cref="Content"/>の末尾に複数の要素を追加します。
@@ -202,7 +187,6 @@ class ColoredString
     /// </summary>
     public ConsoleColor Color { get; set; } = White;
     public ColoredString(string text, ConsoleColor color) => (Text, Color) = (text, color);
-    public ColoredString() : this(string.Empty, White) { }
     /// <summary>
     /// 色付き文字列を出力します。
     /// </summary>

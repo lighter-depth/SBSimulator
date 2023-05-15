@@ -191,21 +191,6 @@ internal static class SBExtention
         return name.Contains('*') || name.Contains('＊');
     }
     /// <summary>
-    /// 文字列を<see cref="SBMode"/>列挙型に変換します。
-    /// </summary>
-    /// <param name="symbol">変換する文字列のインスタンス</param>
-    /// <returns>変換した<see cref="SBMode"/>列挙型のインスタンス</returns>
-    public static SBMode StringToMode(this string symbol)
-    {
-        return symbol switch
-        {
-            "D" or "d" or "DEFAULT" or Program.DEFAULT_MODE => SBMode.Default,
-            "C" or "c" or "CLASSIC" or Program.CLASSIC_MODE => SBMode.Classic,
-            "S" or "s" or "AGEOFSEED" or Program.AOS_MODE => SBMode.AgeOfSeed,
-            _ => SBMode.Empty
-        };
-    }
-    /// <summary>
     /// 二つの文字がしりとりのルール上一致するかを判定します。
     /// </summary>
     /// <param name="previous">判定元になる文字</param>
@@ -228,21 +213,6 @@ internal static class SBExtention
          || previous == 'を' && current == 'お')
             return true;
         return false;
-    }
-    /// <summary>
-    /// <see cref="SBMode"/>列挙型を文字列に変換します。
-    /// </summary>
-    /// <param name="mode">変換する<see cref="SBMode"/>列挙型のインスタンス</param>
-    /// <returns>変換した文字列のインスタンス</returns>
-    public static string ModeToString(this SBMode mode)
-    {
-        return mode switch
-        {
-            SBMode.Default => Program.DEFAULT_MODE,
-            SBMode.Classic => Program.CLASSIC_MODE,
-            SBMode.AgeOfSeed => Program.AOS_MODE,
-            _ => "EMPTY"
-        };
     }
     /// <summary>
     /// 指定した要素で空の<see cref="List{T}"/>を埋めます。

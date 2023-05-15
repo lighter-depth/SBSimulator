@@ -35,15 +35,4 @@ internal static class SBOptions
     /// </summary>
     public static bool IsCPUDelayEnabled { get; set; } = true;
     #endregion
-
-    /// <summary>
-    /// モードの種類を表す列挙型です。
-    /// </summary>
-    public enum SBMode
-    {
-        Empty, 
-        Default,
-        Classic, 
-        AgeOfSeed
-    }
 }
