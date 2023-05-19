@@ -86,6 +86,10 @@ namespace SBSimulator.Source
         public bool IsViolence => !IsHeal && ContainsType(Violence);
         #endregion
 
+        #region constants
+        public const int NUMBER_OF_TYPES = 25;
+        #endregion
+
         #region private fields
         /// <summary>
         /// タイプ相性を表す二次元配列

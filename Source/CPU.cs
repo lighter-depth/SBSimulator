@@ -1,8 +1,6 @@
 ﻿using static SBSimulator.Source.Word;
-using static SBSimulator.Source.SBOptions;
 using static SBSimulator.Source.SBExtention;
 using System.Reflection;
-using System.Net.NetworkInformation;
 using System.Diagnostics.CodeAnalysis;
 
 namespace SBSimulator.Source;
@@ -13,15 +11,15 @@ namespace SBSimulator.Source;
 internal enum TurnProceedingArbiter
 {
     /// <summary>
-    /// 先攻かどうかはランダムに決定されます。
+    /// プレイヤーが先攻かどうかはランダムに決定されます。
     /// </summary>
     Random,
     /// <summary>
-    /// 必ず先攻になります。
+    /// プレイヤーは必ず先攻になります。
     /// </summary>
     True,
     /// <summary>
-    /// 必ず後攻になります。
+    /// プレイヤーは必ず後攻になります。
     /// </summary>
     False
 }
@@ -69,7 +67,7 @@ internal abstract class CPUPlayer : Player
     /// CPUの初期とくせい
     /// </summary>
     public virtual Ability FirstAbility => new Debugger();
-    static int _millisecondsDelay = 1800;
+    static readonly int _millisecondsDelay = 1800;
     public CPUPlayer(string name, Ability ability) : base(name, ability) { }
     public CPUPlayer() : base() { }
     /// <summary>
@@ -81,7 +79,7 @@ internal abstract class CPUPlayer : Player
         return Task.Run(executeAsync).GetAwaiter().GetResult();
         async Task<string[]> executeAsync()
         {
-            var timer = IsCPUDelayEnabled ? Task.Delay(_millisecondsDelay) : Task.Run(() => { });
+            var timer = Parent?.IsCPUDelayEnabled == true ? Task.Delay(_millisecondsDelay) : Task.Run(() => { });
             var result = await Task.Run(() => Execute(0));
             await timer;
             return result;
@@ -99,12 +97,36 @@ internal abstract class CPUPlayer : Player
     /// <param name="type">タイプの指定</param>
     /// <param name="word">出力された<see cref="Word"/>クラスのインスタンス</param>
     /// <returns>単語が見つかったかどうかを表すフラグ</returns>
-    public bool TryWordSearchByType(char startChar, WordType type, out Word word)
+    public bool TryWordSearchByType(char startChar, WordType type, [NotNullWhen(true)]out Word? word)
     {
+        word = null;
+        if (Parent is null) return false;
         word = new();
-        var resultWords = SBDictionary.TypedWords.Where(x => x.Key[0] == startChar && x.Value.Contains(type) && Parent?.UsedWords.Contains(x.Key) == false).ToDictionary(p => p.Key, p => p.Value);
+        var resultWords = SBDictionary.TypedWords.Where(x => x.Key[0] == startChar && x.Value.Contains(type) && !Parent.UsedWords.Contains(x.Key)).ToDictionary(p => p.Key, p => p.Value);
         var random = new Random().Next(resultWords.Count);
-        if (resultWords.Count != 0 && Parent?.TryInferWordTypes(resultWords.ElementAt(random).Key, out var wordTemp) == true)
+        if (resultWords.Count != 0 && Parent.TryInferWordTypes(resultWords.ElementAt(random).Key, out var wordTemp))
+        {
+            word = wordTemp;
+            return true;
+        }
+        return false;
+    }
+    /// <summary>
+    /// 指定した条件に合う単語を検索します。
+    /// </summary>
+    /// <param name="startChar">最初の文字の指定</param>
+    /// <param name="type1">タイプ1の指定</param>
+    /// <param name="type2">タイプ1の指定</param>
+    /// <param name="word">出力された<see cref="Word"/>クラスのインスタンス</param>
+    /// <returns>単語が見つかったかどうかを表すフラグ</returns>
+    public bool TryWordSearchByType(char startChar, WordType type1, WordType type2, [NotNullWhen(true)] out Word? word)
+    {
+        word = null;
+        if (Parent is null) return false;
+        word = new();
+        var resultWords = SBDictionary.TypedWords.Where(x => x.Key[0] == startChar && x.Value.Contains(type1) && x.Value.Contains(type2) && !Parent.UsedWords.Contains(x.Key)).ToDictionary(p => p.Key, p => p.Value);
+        var random = new Random().Next(resultWords.Count);
+        if (resultWords.Count != 0 && Parent.TryInferWordTypes(resultWords.ElementAt(random).Key, out var wordTemp))
         {
             word = wordTemp;
             return true;
@@ -117,15 +139,42 @@ internal abstract class CPUPlayer : Player
     /// <param name="pred">条件の指定</param>
     /// <param name="word">出力された<see cref="Word"/>クラスのインスタンス</param>
     /// <returns>単語が見つかったかどうかを表すフラグ</returns>
-    public bool TryWordSearchByName(Predicate<string> pred, out Word word)
+    public bool TryWordSearchByName(Predicate<string> pred, [NotNullWhen(true)]out Word? word)
     {
-        word = new();
+        word = null;
         if (Parent is null) return false;
-        var resultWords = SBDictionary.PerfectNoTypeDic.Keys.Where(x => pred(x) && !Parent.UsedWords.Contains(x)).Concat(SBDictionary.TypedWords.Keys.Where(x => pred(x) && !Parent.UsedWords.Contains(x))).ToList();
+        var resultWords = SBDictionary.PerfectNameDic.Where(x => pred(x) && !Parent.UsedWords.Contains(x)).ToList();
         var random = new Random().Next(resultWords.Count);
         if (resultWords.Count != 0 && Parent.TryInferWordTypes(resultWords[random], out var wordTemp))
         {
             word = wordTemp;
+            return true;
+        }
+        return false;
+    }
+    public bool TrySearchKillWord(char startChar, Word prev, [NotNullWhen(true)] out Word? word)
+    {
+        word = null;
+        var resultTypeList = new List<Word>();
+        var resultList = new List<Word>();
+        if(Parent is null) return false;
+        for(var i = 0; i < NUMBER_OF_TYPES; i++)
+        {
+            for(var j = 0; j < NUMBER_OF_TYPES; j++)
+            {
+                var w = new Word(string.Empty, (WordType)i, (WordType)j);
+                if (w.CalcAmp(prev) >= 8) resultTypeList.Add(w);
+            }
+        }
+        if (resultTypeList.Count == 0) return false;
+        foreach(var i in resultTypeList)
+        {
+            if (TryWordSearchByType(startChar, i.Type1, i.Type2, out var wordTemp))
+                resultList.Add(wordTemp);
+        }
+        if(resultList.Count > 0)
+        {
+            word = resultList[new Random().Next(resultList.Count)];
             return true;
         }
         return false;
@@ -137,10 +186,11 @@ internal abstract class CPUPlayer : Player
     /// <returns>出力された<see cref="Word"/>クラスのインスタンス</returns>
     public Word FindSomeWord(char startchar)
     {
+        if (Parent is null) return new();
         var result = new Word();
         foreach (var i in SBDictionary.TypedWords.Keys)
         {
-            if (i?[0] == startchar && !Parent?.UsedWords.Contains(i) == true)
+            if (i?[0] == startchar && !Parent.UsedWords.Contains(i))
             {
                 Parent?.TryInferWordTypes(i, out result);
                 return result;
@@ -148,9 +198,9 @@ internal abstract class CPUPlayer : Player
         }
         foreach (var i in SBDictionary.NoTypeWords)
         {
-            if (i?[0] == startchar && !Parent?.UsedWords.Contains(i) == true)
+            if (i?[0] == startchar && !Parent.UsedWords.Contains(i))
             {
-                result = new(i, this, Parent?.OtherPlayer ?? new(), WordType.Empty);
+                result = new(i, this, Parent.OtherPlayer, WordType.Empty);
                 return result;
             }
         }
@@ -241,33 +291,13 @@ internal class NuzemeAI : CPUPlayer
     // HACK: 探索のアルゴリズムを改善したい。
     public override string[] Execute(params int[] args)
     {
+        if (Parent is null) return Array.Empty<string>();
         var startchar = GetStartChar();
         var word = GetLastWord();
-        /*
-        if(word.Name == "ぬま" && Parent?.OtherPlayer.HP is <= 51)
+        if(TrySearchKillWord(startchar, Parent.OtherPlayer.CurrentWord, out var killWord))
         {
-            return Ability is not Shinkoushin ? new[] { "change", "r" }
-            : new[] { "まじゅつ" };
+            return new[] { killWord.Name };
         }
-        if (word.Name == "ぬい" && Parent?.OtherPlayer.HP is <= 51)
-        {
-            return Ability is not Zuboshi ? new[] { "change", "z" }
-            : new[] { "いやがらせ" };
-        }
-        if (word.Name == "ぬりえ" && Parent?.OtherPlayer.HP is <= 51)
-        {
-            return Ability is not Zuboshi ? new[] { "change", "z" }
-            : new[] { "えろ" };
-        }
-        if (word.Name == "ぬか") return new[] { "かが" };
-        if (word.Name == "ぬーどる") return new[] { "るーじゅばっく" };
-        if (word.Name == "ぬえ" && Parent?.OtherPlayer.HP is <= 51) return new[] { "えいぶらむす" };
-        if (word.Name == "ぬいぐるみ" && Parent?.OtherPlayer.HP is <= 34) return new[] { "みずしょうばい" };
-        if (word.Name == "ぬし" && Parent?.OtherPlayer.HP is <= 34) return new[] { "しまかぜ" };
-        if (word.Type1 == WordType.Empty && Parent?.OtherPlayer.HP is <= 20) return new[] { "ぬきうちてすと" };
-        if (word.Name == "ぬー" && Parent?.OtherPlayer.HP is <= 34) return new[] { "ぬる" };
-        */
-
         if (TryWordSearchByName(x => x.Length > 6 && x[0] == startchar && x[^1] == 'ぬ', out var wordNuzeme7))
         {
             return new[] { wordNuzeme7.Name };

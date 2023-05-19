@@ -1,6 +1,4 @@
 ﻿using static SBSimulator.Source.Word;
-using static SBSimulator.Source.SBOptions;
-using static SBSimulator.Source.SBExtention;
 
 namespace SBSimulator.Source;
 /// <summary>
@@ -155,7 +153,7 @@ internal class Player
 
     #region constructors
     public Player(string name, Ability abil) => (Name, Ability, HP) = (name, abil, MaxHP);
-    public Player() : this("じぶん", AbilityFactory.Create("n")!) { }
+    public Player() : this("じぶん", new Debugger()) { }
     #endregion
 
     #region enums
@@ -230,16 +228,6 @@ internal class Player
     }
 
     /// <summary>
-    /// 攻撃を実行します。
-    /// </summary>
-    /// <param name="other">攻撃対象のプレイヤー</param>
-    /// <param name="damage">ダメージ量</param>
-    public void Attack(Player other, double damage)
-    {
-        other.HP -= (int)damage;
-    }
-
-    /// <summary>
     /// プレイヤーを毒状態にします。
     /// </summary>
     public void Poison()
@@ -295,7 +283,7 @@ internal class Player
         var otherHPResult = other.HP + SeedDmg;
         if (otherHPResult > other.MaxHP) other.HP = other.MaxHP;
         else other.HP = otherHPResult;
-        if (!IsSeedInfinite) _seedCount++;
+        if (Parent?.IsSeedInfinite == false) _seedCount++;
         if (_seedCount > MaxSeedTurn) State &= ~PlayerState.Seed;
     }
 
@@ -309,7 +297,7 @@ internal class Player
         {
             var resultHPCure = HP + 40;
             HP = resultHPCure <= MaxHP ? resultHPCure : MaxHP;
-            if (!IsCureInfinite) CureCount++;
+            if (Parent?.IsCureInfinite == false) CureCount++;
             return;
         }
         var resultHPFood = HP + 20;

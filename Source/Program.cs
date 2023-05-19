@@ -1,9 +1,7 @@
 ﻿using System.Text;
-using static SBSimulator.Source.SBOptions;
 using static System.ConsoleColor;
 using System.Text.RegularExpressions;
 using System.Runtime.CompilerServices;
-using System.Linq.Expressions;
 
 /*   ◆辞書について
  *   
@@ -66,7 +64,7 @@ namespace SBSimulator.Source;
 class Program
 {
     #region static fields
-    static readonly string Version = "v0.4.8";
+    static readonly string Version = "v0.5.0";
     static readonly Window window = new();
     static Mode Mode = new();
     static Battle battle = new();
@@ -74,10 +72,6 @@ class Program
     static readonly string NoTypeWordsPath = DicDir + @"\no type\no-type-words.csv";
     static readonly string NoTypeWordExPath = DicDir + @"\no type\no-type-word-extension.csv";
     static readonly string TypedWordsPath = DicDir + @"\typed";
-    /// <summary>
-    /// HPのリセットを正常に行うためのフラグです。
-    /// </summary>
-    public static bool IsMaxHPModifiedOnSetUp { get; internal set; } = false;
     static readonly Task DictionaryImportTask;
     /// <summary>
     /// <see cref="Battle"/>クラスのインスタンスに追加で渡すハンドラーの情報
@@ -136,6 +130,8 @@ class Program
     internal const string AOS_MODE = "AgeOfSeed";
     const string STRICT = "strict";
     const string INFER = "inference";
+    const string CUSTOM_ABIL = "CustomAbil";
+    const string CPU_DELAY = "CPUDelay";
     #endregion
 
     #region methods
@@ -147,6 +143,7 @@ class Program
     {
         try
         {
+            Console.Title = "しりバトシミュレーター";
             var (p1, p2) = SetUp();
             Console.WriteLine("辞書を読み込み中...\n\nしばらくお待ちください...");
             DictionaryImportTask.Wait();
@@ -155,8 +152,8 @@ class Program
             battle.Player2.Register(battle);
             Mode.Set(battle);
             battle.OnReset += Reset;
-            battle.In += () => Console.ReadLine()?.Trim().Split() ?? Array.Empty<string>();
-            battle.Out += Output;
+            battle.In = () => Console.ReadLine()?.Trim().Split() ?? Array.Empty<string>();
+            battle.Out = Output;
             battle.Run(CustomFunctions);
             OnExitApp();
         }
@@ -447,7 +444,10 @@ class Program
                         ("・カスタム モード\n", Yellow).WriteLine();
                         ("起動直後のモード設定でのみ参照可能なモード名です。", Yellow).WriteLine();
                         ("細かい設定を手動で調整することができます。\n", Yellow).WriteLine();
-                        ("参照名: \"Custom\", \"cs\"\n\n", Yellow).WriteLine();
+                        ("参照名: \"Custom\", \"cs\"\n", Yellow).WriteLine();
+                        ("・先攻指定付きデフォルトモード\n", Yellow).WriteLine();
+                        ($"{DEFAULT_MODE}モードと同じステージ条件で、どちらのプレイヤーが先攻するかを\n指定することができます。\n", Yellow).WriteLine();
+                        ("参照名: \"p1\"(プレイヤー１が先攻する場合), \"p2\"(プレイヤー２が先攻する場合)\n\n", Yellow).WriteLine();
                         ("...続けるには任意のキーを押してください...", White).WriteLine();
                         Console.ReadLine();
                         break;
@@ -546,6 +546,7 @@ class Program
     /// <returns>プレイヤーの初期情報</returns>
     static (Player, Player) SetUp()
     {
+        Console.Clear();
         ("しりとりバトルシミュレーターへようこそ。", Yellow).WriteLine();
         ($"モードの名前を入力してください。(デフォルトでは{DEFAULT_MODE} モードになります)", Yellow).WriteLine();
         var modeOrder = Console.ReadLine();
@@ -651,7 +652,7 @@ class Program
         if (isP1Human)
         {
             ("プレイヤーの初期特性を入力してください。(デフォルトではデバッガーになります)", Yellow).WriteLine();
-            p1Abil = AbilityFactory.Create(Console.ReadLine() ?? "N") ?? new Debugger();
+            p1Abil = AbilityFactory.Create(Console.ReadLine() ?? "N", true) ?? new Debugger();
             ($"{p1Name} の初期特性を {p1Abil.ToString()} に設定しました。", Green).WriteLine();
         }
         else
@@ -662,7 +663,7 @@ class Program
         if (isP2Human)
         {
             ("相手の初期特性を入力してください。(デフォルトではデバッガーになります)", Yellow).WriteLine();
-            p2Abil = AbilityFactory.Create(Console.ReadLine() ?? "N") ?? new Debugger();
+            p2Abil = AbilityFactory.Create(Console.ReadLine() ?? "N", true) ?? new Debugger();
             ($"{p2Name} の初期特性を {p2Abil.ToString()} に設定しました。", Green).WriteLine();
         }
         else
@@ -717,7 +718,7 @@ class Program
         Ability? p1Abil, p2Abil;
         CPUPlayer? p2CPU;
         ("プレイヤーの初期特性を入力してください。(デフォルトではデバッガーになります)", Yellow).WriteLine();
-        p1Abil = AbilityFactory.Create(Console.ReadLine() ?? "N") ?? new Debugger();
+        p1Abil = AbilityFactory.Create(Console.ReadLine() ?? "N", true) ?? new Debugger();
         ($"{p1Name} の初期特性を {p1Abil.ToString()} に設定しました。", Green).WriteLine();
         p2CPU = CPUFactory.Create(p2Name) ?? new Tsuyoshi(p2Name, new Kakumei());
         p2Abil = p2CPU.FirstAbility;
@@ -827,7 +828,7 @@ class Program
         if (isP1Human)
         {
             ("プレイヤーの初期特性を入力してください。(デフォルトではデバッガーになります)", Yellow).WriteLine();
-            p1Abil = AbilityFactory.Create(Console.ReadLine() ?? "N") ?? new Debugger();
+            p1Abil = AbilityFactory.Create(Console.ReadLine() ?? "N", true) ?? new Debugger();
             ($"{p1Name} の初期特性を {p1Abil.ToString()} に設定しました。", Green).WriteLine();
         }
         else
@@ -838,7 +839,7 @@ class Program
         if (isP2Human)
         {
             ("相手の初期特性を入力してください。(デフォルトではデバッガーになります)", Yellow).WriteLine();
-            p2Abil = AbilityFactory.Create(Console.ReadLine() ?? "N") ?? new Debugger();
+            p2Abil = AbilityFactory.Create(Console.ReadLine() ?? "N", true) ?? new Debugger();
             ($"{p2Name} の初期特性を {p2Abil.ToString()} に設定しました。", Green).WriteLine();
         }
         else
@@ -849,6 +850,20 @@ class Program
         ("続けるには任意のキーを入力してください. . . ", White).WriteLine();
         Console.ReadLine();
         Console.Clear();
+        TurnProceedingArbiter p1TPA, p2TPA;
+        ("プレイヤーが先攻するかどうかを決定してください。(先攻 → t キー、後攻 → f キー、ランダム → r キーを入力)", Yellow).WriteLine();
+        var tpaOrder = Console.ReadLine();
+        (p1TPA, p2TPA) = tpaOrder is "t" ? (TurnProceedingArbiter.True, TurnProceedingArbiter.False)
+            : tpaOrder is "f" ? (TurnProceedingArbiter.False, TurnProceedingArbiter.True)
+            : (TurnProceedingArbiter.Random, TurnProceedingArbiter.Random);
+        var tpaString = p1TPA switch
+        {
+            TurnProceedingArbiter.Random => "ランダム",
+            TurnProceedingArbiter.True => "先攻",
+            TurnProceedingArbiter.False => "後攻",
+            _ => "天で話にならねぇよ..."
+        };
+        ($"{p1Name}の先攻/後攻設定を「{tpaString}」に設定しました。", Green).WriteLine();
         int p1HP, p2HP;
         ("プレイヤーの最大HPを入力してください。(デフォルトでは60です)", Yellow).WriteLine();
         p1HP = int.TryParse(Console.ReadLine(), out p1HP) ? p1HP : 60;
@@ -884,7 +899,7 @@ class Program
         ("OK！ → 任意のキーを入力", Yellow).WriteLine();
         p1 = isP1Human ? new Player(p1Name, p1Abil) : p1CPU;
         p2 = isP2Human ? new Player(p2Name, p2Abil) : p2CPU;
-        Mode = new Mode(p1HP, p2HP, isSeedInfinite, isCureInfinite, isAbilChangeable);
+        Mode = new Mode(p1TPA, p2TPA, p1HP, p2HP, isSeedInfinite, isCureInfinite, isAbilChangeable, 3, 5, 6, 5, 4, 1.5, 3);
         Console.Clear();
         return (p1, p2);
     }
@@ -985,18 +1000,17 @@ class Program
     static void ShowOptions()
     {
         Console.Clear();
-        ("\n"
-         + $"{INFINITE_SEED}:      {IsSeedInfinite}\n\n"
-         + $"{INFINITE_CURE}:      {IsCureInfinite}\n\n"
-         + $"Strict Mode:       {IsStrict}\n\n"
-         + $"Type Inference:    {IsInferable}\n\n"
+        ($"\n{INFINITE_SEED}:      {battle.IsSeedInfinite}                     CustomAbilities:   {battle.IsCustomAbilUsable}\n\n"
+         + $"{INFINITE_CURE}:      {battle.IsCureInfinite}                     CPUDelay:          {battle.IsCPUDelayEnabled}\n\n"
+         + $"Strict Mode:       {battle.IsStrict}\n\n"
+         + $"Type Inference:    {battle.IsInferable}\n\n"
          + $"MaxCureCount:      {Player.MaxCureCount}回\n\n"
          + $"MaxFoodCount:      {Player.MaxFoodCount}回\n\n"
          + $"SeedDamage:        {Player.SeedDmg}\n\n"
          + $"MaxSeedTurn:       {Player.MaxSeedTurn}\n\n"
          + $"InsBufQuantity:    {Player.InsBufQty}段階\n\n"
          + $"CritDamageMultiplier:      {Player.CritDmg}倍\n\n"
-         + $"ChangeableAbility:         {IsAbilChangeable}\n\n"
+         + $"ChangeableAbility:         {battle.IsAbilChangeable}\n\n"
          + $"ChangeableAbilityCount:    {Player.MaxAbilChange}回\n\n", Yellow).WriteLine();
         ("終了するには、任意のキーを押してください. . . ", White).WriteLine();
         Console.ReadLine();

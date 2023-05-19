@@ -1,8 +1,5 @@
 ﻿using System.Diagnostics.CodeAnalysis;
 using static SBSimulator.Source.Word;
-using static System.ConsoleColor;
-using static SBSimulator.Source.SBOptions;
-using static System.Net.Mime.MediaTypeNames;
 
 namespace SBSimulator.Source;
 /// <summary>
@@ -117,7 +114,7 @@ internal abstract class Contract
     public virtual bool OnWordUsedCheck()
     {
         State = AbilityType.WordUsedChecked;
-        if (IsStrict && Args.IsInferSuccessed)
+        if (Parent.IsStrict && Args.IsInferSuccessed)
         {
             var strictFlag = Word.IsSuitable(Receiver.CurrentWord);
             Args.IsWordNotUsed = !Parent.UsedWords.Contains(Word.Name);
@@ -155,7 +152,7 @@ internal abstract class Contract
             Actor.Ability.Execute(this);
             return true;
         }
-        if (IsInferable)
+        if (Parent.IsInferable)
         {
             if (!Args.IsInferSuccessed)
             {
@@ -436,7 +433,7 @@ internal class AttackContract : Contract
         var randomFlag = !(Actor.CurrentWord.Type1 == WordType.Empty || Receiver.CurrentWord.Type1 == WordType.Empty);
         var random = randomFlag ? 0.85 + new Random().Next(15) * 0.01 : 1;
         var damage = (int)(critDmg * (int)(AmpDmg * BrdDmg * (int)(BaseDmg * PropDmg * MtpDmg * random)));
-        Actor.Attack(Receiver, damage);
+        Receiver.HP -= damage;
     }
     /// <summary>
     /// アクションの結果を判定します。
@@ -557,7 +554,7 @@ internal class HealContract : Contract
         }
         if (IsCure)
         {
-            CanHeal = Actor.CureCount < Player.MaxCureCount || IsCureInfinite;
+            CanHeal = Actor.CureCount < Player.MaxCureCount || Parent.IsCureInfinite;
             return;
         }
         CanHeal = Actor.FoodCount < Player.MaxFoodCount;
@@ -568,7 +565,6 @@ internal class HealContract : Contract
         if (Actor.Ability.Type.HasFlag(State))
         {
             Actor.Ability.Execute(this);
-            return;
         }
         if (!CanHeal)
         {

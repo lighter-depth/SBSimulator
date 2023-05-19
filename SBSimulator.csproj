@@ -5,6 +5,7 @@
     <TargetFramework>net7.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
+    <ApplicationIcon>imgs\SBicon1.ico</ApplicationIcon>
   </PropertyGroup>
 
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|AnyCPU'">
@@ -23,6 +24,7 @@
     <Folder Include="dic\typed\ま行\" />
     <Folder Include="dic\typed\や行\" />
     <Folder Include="dic\typed\ら行\" />
+    <Folder Include="imgs\" />
   </ItemGroup>
 
 </Project>

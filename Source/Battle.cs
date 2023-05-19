@@ -1,8 +1,7 @@
-﻿using System.Text.RegularExpressions;
-using System.Linq;
+﻿using System.Diagnostics.CodeAnalysis;
+using System.Text.RegularExpressions;
 using Umayadia.Kana;
 using static SBSimulator.Source.Word;
-using static SBSimulator.Source.SBOptions;
 
 namespace SBSimulator.Source;
 // Program クラスで行っている処理を抽出したクラス。
@@ -43,11 +42,11 @@ internal class Battle
     /// <summary>
     /// 入力処理を行うハンドラー
     /// </summary>
-    public event Func<string[]>? In;
+    [property: NotNull] public Func<string[]>? In { get; set; }
     /// <summary>
     /// 出力処理を行うハンドラー
     /// </summary>
-    public event Action<List<AnnotatedString>>? Out;
+    [property: NotNull] public Action<List<AnnotatedString>>? Out { get; set; }
     /// <summary>
     /// 出力する情報を保存するバッファー
     /// </summary>
@@ -69,6 +68,34 @@ internal class Battle
     /// アクションを受ける側のプレイヤー
     /// </summary>
     public Player OtherPlayer => IsPlayer1sTurn ? Player2 : Player1;
+    /// <summary>
+    /// やどりぎが永続するかどうかを表すフラグです。
+    /// </summary>
+    public bool IsSeedInfinite { get; set; } = false;
+    /// <summary>
+    /// 医療タイプの単語による回復が無限に使用可能かどうかを表すフラグです。
+    /// </summary>
+    public bool IsCureInfinite { get; set; } = false;
+    /// <summary>
+    /// とくせいの変更が可能かどうかを表すフラグです。
+    /// </summary>
+    public bool IsAbilChangeable { get; set; } = true;
+    /// <summary>
+    /// ストリクト モードが有効かどうかを表すフラグです。
+    /// </summary>
+    public bool IsStrict { get; set; } = true;
+    /// <summary>
+    /// タイプ推論が有効かどうかを表すフラグです。
+    /// </summary>
+    public bool IsInferable { get; set; } = true;
+    /// <summary>
+    /// カスタムとくせいが使用可能かどうかを表すフラグです。
+    /// </summary>
+    public bool IsCustomAbilUsable { get; set; } = true;
+    /// <summary>
+    /// CPUの行動に待ち時間を設けるかを表すフラグです。
+    /// </summary>
+    public bool IsCPUDelayEnabled { get; set; } = true;
 
     public Battle(Player p1, Player p2) => (Player1, Player2) = (p1, p2);
     public Battle() : this(new(), new()) { }
@@ -80,17 +107,17 @@ internal class Battle
     public void Run(Dictionary<string, Action<string[], CancellationTokenSource>> custom)
     {
         Initialize(custom);
-        Out?.Invoke(Buffer);
+        Out(Buffer);
         var cts = new CancellationTokenSource();
         while (!cts.IsCancellationRequested)
         {
             Buffer.Clear();
 
             // 入力処理、CPU かどうかを判定
-            var order = CurrentPlayer is not CPUPlayer cpu ? In?.Invoke() : cpu.Execute();
+            var order = CurrentPlayer is not CPUPlayer cpu ? In() : cpu.Execute();
             if (order?.Length is 0 || string.IsNullOrWhiteSpace(order?[0])) 
             {
-                Out?.Invoke(Buffer);
+                Out(Buffer);
                 continue;
             }
 
@@ -101,7 +128,7 @@ internal class Battle
                 OnDefault(order, cts);
 
             // 出力処理
-            Out?.Invoke(Buffer);
+            Out(Buffer);
 
         }
     }
@@ -133,12 +160,9 @@ internal class Battle
         var randomFlag = new Random().Next(2) == 0;
         var p1TPA = Player1.Proceeding;
         var p2TPA = Player2.Proceeding;
-        if (p1TPA == TurnProceedingArbiter.True && p1TPA == p2TPA) return randomFlag;
-        if (p1TPA == TurnProceedingArbiter.False && p1TPA == p2TPA) return randomFlag;
-        if (p1TPA == TurnProceedingArbiter.True) return true;
-        if (p2TPA == TurnProceedingArbiter.True) return false;
-        if (p1TPA == TurnProceedingArbiter.False) return false;
-        if (p2TPA == TurnProceedingArbiter.False) return true;
+        if (p1TPA == p2TPA) return randomFlag;
+        if (p1TPA == TurnProceedingArbiter.True || p2TPA == TurnProceedingArbiter.False) return true;
+        if (p1TPA == TurnProceedingArbiter.False || p2TPA == TurnProceedingArbiter.True) return false;
         return randomFlag;
     }
 
@@ -215,7 +239,7 @@ internal class Battle
         // パラメータにプレイヤーを指定していない場合の処理
         if (order.Length == 2)
         {
-            var nextAbil = AbilityFactory.Create(order[1]);
+            var nextAbil = AbilityFactory.Create(order[1], IsCustomAbilUsable);
             if (nextAbil is null)
             {
                 Buffer.Add($"入力 {order[1]} に対応するとくせいが見つかりませんでした。", Notice.Warn);
@@ -247,7 +271,7 @@ internal class Battle
                 abilChangingP = Player1;
             else if (player2Flag)
                 abilChangingP = Player2;
-            var nextAbil = AbilityFactory.Create(order[2]);
+            var nextAbil = AbilityFactory.Create(order[2], IsCustomAbilUsable);
             if (nextAbil is null)
             {
                 Buffer.Add($"入力 {order[2]} に対応するとくせいが見つかりませんでした。", Notice.Warn);
@@ -287,6 +311,8 @@ internal class Battle
             "abilchange" or "ac" => OptionAbilChange,
             "strict" or "s" => OptionStrict,
             "infer" or "i" => OptionInfer,
+            "customabil" or "ca" or "cs" => OptionCustomAbil,
+            "cpudelay" or "delay" or "cd" => OptionCPUDelay,
             "setabilcount" or "sac" => OptionSetAbilCount,
             "setmaxcurecount" or "smcc" or "smc" => OptionSetMaxCureCount,
             "setmaxfoodcount" or "smfc" or "smf" => OptionSetMaxFoodCount,
@@ -311,12 +337,12 @@ internal class Battle
             Buffer.Add("入力が不正です。", Notice.Warn);
             return;
         }
-        if (!int.TryParse(order[3], out int hp))
+        if (!int.TryParse(order[3], out var hp))
         {
             Buffer.Add("HPの書式が不正です。", Notice.Warn);
             return;
         }
-        if (!TryStringToPlayer(order[2], out Player p))
+        if (!TryStringToPlayer(order[2], out var p))
         {
             Buffer.Add($"プレイヤー {order[2]} が見つかりませんでした。", Notice.Warn);
             return;
@@ -430,6 +456,58 @@ internal class Battle
         }
         IsInferable = false;
         Buffer.Add($"タイプの推論を無効にしました。", Notice.SettingInfo);
+    }
+    private void OptionCustomAbil(string[] order)
+    {
+        if (order.Length != 3)
+        {
+            Buffer.Add("入力が不正です。", Notice.Warn);
+            return;
+        }
+        if (!order[2].TryStringToEnabler(out bool enabler))
+        {
+            Buffer.Add("入力が不正です。", Notice.Warn);
+            return;
+        }
+        if (enabler)
+        {
+            IsCustomAbilUsable = true;
+            Buffer.Add($"カスタム特性を有効にしました。", Notice.SettingInfo);
+            return;
+        }
+        IsCustomAbilUsable = false;
+        Buffer.Add($"カスタム特性を無効にしました。", Notice.SettingInfo);
+        if(Player1.Ability is CustomAbility)
+        {
+            Buffer.Add($"特性が見つかりません。{Player1.Name} の特性をデバッガーに設定します。", Notice.Caution);
+            Player1.Ability = new Debugger();
+        }
+        if (Player2.Ability is CustomAbility)
+        {
+            Buffer.Add($"特性が見つかりません。{Player2.Name} の特性をデバッガーに設定します。", Notice.Caution);
+            Player2.Ability = new Debugger();
+        }
+    }
+    private void OptionCPUDelay(string[] order)
+    {
+        if (order.Length != 3)
+        {
+            Buffer.Add("入力が不正です。", Notice.Warn);
+            return;
+        }
+        if (!order[2].TryStringToEnabler(out bool enabler))
+        {
+            Buffer.Add("入力が不正です。", Notice.Warn);
+            return;
+        }
+        if (enabler)
+        {
+            IsCPUDelayEnabled = true;
+            Buffer.Add($"CPUの待ち時間を有効にしました。", Notice.SettingInfo);
+            return;
+        }
+        IsCPUDelayEnabled = false;
+        Buffer.Add($"CPUの待ち時間を無効にしました。", Notice.SettingInfo);
     }
     private void OptionSetAbilCount(string[] order)
     {
@@ -609,8 +687,9 @@ internal class Battle
     /// <param name="s">推論元の文字列</param>
     /// <param name="p">指定されたプレイヤー</param>
     /// <returns>推論が成功したかどうかを表すフラグ</returns>
-    private bool TryStringToPlayer(string s, out Player p)
+    private bool TryStringToPlayer(string s, [NotNullWhen(true)] out Player? p)
     {
+        p = null;
         if (s == Player1.Name || s.ToLower() is "player1" or "p1")
         {
             p = Player1;
@@ -621,7 +700,6 @@ internal class Battle
             p = Player2;
             return true;
         }
-        p = new();
         return false;
     }
 }

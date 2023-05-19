@@ -1,6 +1,4 @@
-﻿using static System.ConsoleColor;
-using static SBSimulator.Source.SBOptions;
-namespace SBSimulator.Source;
+﻿namespace SBSimulator.Source;
 
 // カスタム特性のテスト。
 // CustomAbility クラスを継承して実装する。 
@@ -10,7 +8,7 @@ namespace SBSimulator.Source;
 /// </summary>
 internal abstract class CustomAbility : Ability
 {
-    public override List<string> Name => IsCustomAbilUsable ? CustomName : new();
+    public override List<string> Name => CustomName;
     public abstract List<string> CustomName { get; }
 }
 

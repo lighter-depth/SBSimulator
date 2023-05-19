@@ -1,10 +1,13 @@
 ﻿using static SBSimulator.Source.Word;
-using static SBSimulator.Source.SBOptions;
 
 namespace SBSimulator.Source;
 internal static class SBExtention
 {
     #region methods
+    /// <summary>
+    /// 有効な文字をランダムに出力します。
+    /// </summary>
+    /// <returns>ランダムな文字</returns>
     public static char GetRandomChar()
     {
         var charList = new List<char>

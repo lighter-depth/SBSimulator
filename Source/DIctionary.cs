@@ -35,5 +35,17 @@ internal class SBDictionary
         return temp;
     }
     #endregion
+    public static Dictionary<string, List<WordType>> PerfectDic => _perfectDic ??= GetPerfectDic();
+    static Dictionary<string, List<WordType>>? _perfectDic;
+    static Dictionary<string, List<WordType>> GetPerfectDic()
+    {
+        return TypedWords.Concat(PerfectNoTypeDic.Where(p => !TypedWords.ContainsKey(p.Key))).ToDictionary(p => p.Key, p => p.Value);
+    }
+    public static List<string> PerfectNameDic => _perfectNameDic ??= GetPerfectNameDic();
+    static List<string>? _perfectNameDic;
+    static List<string> GetPerfectNameDic()
+    {
+        return PerfectDic.Keys.ToList();
+    }
 }
 

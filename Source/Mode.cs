@@ -1,5 +1,4 @@
-﻿using System.Diagnostics.CodeAnalysis;
-using static SBSimulator.Source.TurnProceedingArbiter;
+﻿using static SBSimulator.Source.TurnProceedingArbiter;
 
 namespace SBSimulator.Source;
 
@@ -40,6 +39,22 @@ class Mode
     /// とくせいの変更が可能かどうかを表すフラグです。
     /// </summary>
     public bool IsAbilChangeable { get; set; } = true;
+    /// <summary>
+    /// ストリクト モードが有効かどうかを表すフラグです。
+    /// </summary>
+    public bool IsStrict { get; set; } = true;
+    /// <summary>
+    /// タイプ推論が有効かどうかを表すフラグです。
+    /// </summary>
+    public bool IsInferable { get; set; } = true;
+    /// <summary>
+    /// カスタムとくせいが使用可能かどうかを表すフラグです。
+    /// </summary>
+    public bool IsCustomAbilUsable { get; set; } = true;
+    /// <summary>
+    /// CPUの行動に待ち時間を設けるかを表すフラグです。
+    /// </summary>
+    public bool IsCPUDelayEnabled { get; set; } = true;
     /// <summary>
     /// とくせいを変更可能な回数
     /// </summary>
@@ -105,9 +120,13 @@ class Mode
         b.Player2.Proceeding = Player2Proceeds;
         b.Player1.MaxHP = Player1MaxHP;
         b.Player2.MaxHP = Player2MaxHP;
-        SBOptions.IsSeedInfinite = IsSeedInfinite;
-        SBOptions.IsCureInfinite = IsCureInfinite;
-        SBOptions.IsAbilChangeable = IsAbilChangeable;
+        b.IsSeedInfinite = IsSeedInfinite;
+        b.IsCureInfinite = IsCureInfinite;
+        b.IsAbilChangeable = IsAbilChangeable;
+        b.IsStrict = IsStrict;
+        b.IsInferable = IsInferable;
+        b.IsCustomAbilUsable = IsCustomAbilUsable;
+        b.IsCPUDelayEnabled = IsCPUDelayEnabled;
         Player.MaxAbilChange = MaxAbilChange;
         Player.MaxCureCount = MaxCureCount;
         Player.MaxFoodCount = MaxFoodCount;
@@ -132,6 +151,8 @@ class ModeFactory
         return name?.ToUpper() switch
         {
             "D" or "DEFAULT" => (new(), "Default"),
+            "1" or "P1" or "PLAYER1PROCEEDS"or "DEFAULTPLAYER1PROCEEDS" => (new(True, False, 60, 60, false, false, true, 3, 5, 6, 5, 4, 1.5, 3), "DefaultPlayer1Proceeds"),
+            "2" or "P2" or "PLAYER2PROCEEDS" or "DEFAULTPLAYER2PROCEEDS" => (new(False, True, 60, 60, false, false, true, 3, 5, 6, 5, 4, 1.5, 3), "DefaultPlayer2Proceeds"),
             "C" or "CLASSIC" => (new(50, 50, true, true, false), "Classic"),
             "S" or "AOS" or "AGEOFSEED" => (new(60, 60, true, false, true), "AgeOfSeed"),
             "S1" or "STORY1" => (new(False, True, 40, 40, false, "あいて"), "Story1"),

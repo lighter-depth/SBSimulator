@@ -1,6 +1,5 @@
 ﻿using System.Reflection;
 using static SBSimulator.Source.Player;
-using static SBSimulator.Source.SBOptions;
 using static SBSimulator.Source.Word;
 
 namespace SBSimulator.Source;
@@ -94,14 +93,16 @@ internal class AbilityFactory
     /// </summary>
     /// <param name="name">生成に使用する文字列</param>
     /// <returns>入力から推論されたとくせい</returns>
-    public static Ability? Create(string name)
+    public static Ability? Create(string name, bool allowCustomAbility)
     {
         var subClasses = Assembly.GetAssembly(typeof(Ability))?.GetTypes().Where(x => x.IsSubclassOf(typeof(Ability)) && !x.IsAbstract).ToArray() ?? Array.Empty<Type>();
         foreach(var i in subClasses)
         {
             var sub = Activator.CreateInstance(i) as Ability;
-            if(sub?.Name.Contains(name) == true)
+            if(sub?.Name.Contains(name) == true && !(!allowCustomAbility && sub is CustomAbility))
+            {
                 return sub;
+            }
         }
         return null;
     }
@@ -293,7 +294,7 @@ internal class Ikasui : Ability
             hc.CanHeal = true;
             return;
         }
-        hc.CanHeal = hc.Actor.CureCount < MaxCureCount || IsCureInfinite;
+        hc.CanHeal = hc.Actor.CureCount < MaxCureCount || hc.Parent.IsCureInfinite;
     }
     public override string ToString() => "いかすい";
 }
