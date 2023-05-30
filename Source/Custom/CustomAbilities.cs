@@ -42,7 +42,7 @@ internal class MagicMirror : CustomAbility
 /// <summary>
 /// てんねん。バフによる能力上昇補正を無視する。
 /// </summary>
-internal class Tennen : CustomAbility 
+internal class Tennen : CustomAbility
 {
     public override AbilityType Type => AbilityType.MtpCalced;
     public override List<string> CustomName => new() { "ua", "UA", "てんねん", "天然", "unaware", "Unaware", "UNAWARE" };
@@ -88,14 +88,61 @@ internal class Ganjou : CustomAbility
 {
     public override AbilityType Type => AbilityType.Received;
     public override List<string> CustomName => new() { "st", "ST", "がんじょう", "頑丈", "sturdy", "Sturdy", "STURDY" };
-    public override void Execute(Contract c) 
-    { 
-        if(c is not AttackContract ac) return;
-        if(ac.Receiver.HP <= 0 && ac.Args.PreActor.HP == ac.Args.PreActor.MaxHP)
+    public override void Execute(Contract c)
+    {
+        if (c is not AttackContract ac) return;
+        if (ac.Receiver.HP <= 0 && ac.Args.PreActor.HP == ac.Args.PreActor.MaxHP)
         {
             ac.Receiver.HP = 1;
             ac.Message.Add($"{ac.Receiver.Name} はこうげきをこらえた！", Notice.InvokeInfo);
         }
     }
     public override string ToString() => "がんじょう";
+}
+/// <summary>
+/// 「最強の特性」
+/// </summary>
+internal class God : CustomAbility
+{
+    public override AbilityType Type => AbilityType.AmpDecided | AbilityType.CritDecided | AbilityType.ViolenceUsed | AbilityType.ActionEnd | AbilityType.Received;
+    public override List<string> CustomName => new() { "gd", "GD", "神", "かみ", "カミ", "god", "God", "GOD" };
+    public override AnnotatedString? InitMessage { get; protected set; } = ("強すぎてつよしになったわね...", Notice.Warn);
+    public override void Execute(Contract c)
+    {
+        if (c is not AttackContract ac) return;
+        if (ac.State == AbilityType.AmpDecided)
+        {
+            ac.AmpDmg = 2 * Math.Max(0, ac.Actor.CurrentWord.Length - 5) + 1;
+        }
+        if (ac.State == AbilityType.CritDecided)
+        {
+            ac.CritFlag = true;
+        }
+        if (ac.State == AbilityType.ViolenceUsed)
+        {
+            if (ac.Actor.TryChangeATK(Buf, ac.Word))
+            {
+                ac.Message.Add($"{ac.Actor.Name} の攻撃が下がった！(現在{ac.Actor.ATK,0:0.0#}倍)", Notice.BufInfo);
+                return;
+            }
+            ac.Message.Add($"{ac.Actor.Name} の攻撃はもう下がらない！", Notice.Caution);
+        }
+        if (ac.State == AbilityType.ActionEnd)
+        {
+            if (ac.Actor.TryChangeATK(4, ac.Word))
+            {
+                ac.Message.Add($"{ac.Actor.Name} の攻撃がぐーんぐーんと上がった！！！！(現在{ac.Actor.ATK,0:0.0#}倍)", Notice.BufInfo);
+                return;
+            }
+            ac.Message.Add($"{ac.Actor.Name} の攻撃はもう上がらない！", Notice.Caution);
+        }
+        if (ac.State == AbilityType.Received)
+        {
+            ac.Receiver.TryChangeATK(100, ac.Receiver.CurrentWord);
+            ac.Message.Add($"{ac.Receiver.Name} はダメージを受けて攻撃がぐぐーんぐーんと上がった！！！！！ (現在{ac.Receiver.ATK,0:0.0#}倍)", Notice.BufInfo);
+            ac.Receiver.TryChangeDEF(100, ac.Receiver.CurrentWord);
+            ac.Message.Add($"{ac.Receiver.Name} はダメージを受けて防御がぐぐーんぐーんと上がった！！！１！ (現在{ac.Receiver.DEF,0:0.0#}倍)", Notice.BufInfo);
+        }
+    }
+    public override string ToString() => "神";
 }

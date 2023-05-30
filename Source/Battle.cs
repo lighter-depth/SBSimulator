@@ -140,6 +140,8 @@ internal class Battle
     private void Initialize(Dictionary<string, Action<string[], CancellationTokenSource>> custom)
     {
         IsPlayer1sTurn = InitIsP1sTurn();
+        if(CurrentPlayer.Ability.InitMessage is not null) Buffer.Add(CurrentPlayer.Ability.InitMessage);
+        if (OtherPlayer.Ability.InitMessage is not null) Buffer.Add(OtherPlayer.Ability.InitMessage);
         Buffer.Add($"{CurrentPlayer.Name} のターンです", Notice.General);
         Buffer.Add($"{Player1.Name}: {Player1.HP}/{Player1.MaxHP},     {Player2.Name}: {Player2.HP}/{Player2.MaxHP}", Notice.LogInfo);
         OrderFunctions = new()
@@ -251,7 +253,10 @@ internal class Battle
                 return;
             }
             if (CurrentPlayer.TryChangeAbil(nextAbil))
+            {
                 Buffer.Add($"{CurrentPlayer.Name} はとくせいを {nextAbil.ToString()} に変更しました", Notice.SystemInfo);
+                if (nextAbil.InitMessage is not null) Buffer.Add(nextAbil.InitMessage);
+            }
             else
                 Buffer.Add($"{CurrentPlayer.Name} はもう特性を変えられない！", Notice.Caution);
         }
@@ -283,7 +288,10 @@ internal class Battle
                 return;
             }
             if (abilChangingP.TryChangeAbil(nextAbil))
+            {
                 Buffer.Add($"{abilChangingP.Name} はとくせいを {nextAbil.ToString()} に変更しました", Notice.SystemInfo);
+                if (nextAbil.InitMessage is not null) Buffer.Add(nextAbil.InitMessage);
+            }
             else
                 Buffer.Add($"{abilChangingP.Name} はもう特性を変えられない！", Notice.Caution);
         }

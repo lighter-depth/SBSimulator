@@ -64,7 +64,7 @@ namespace SBSimulator.Source;
 class Program
 {
     #region static fields
-    static readonly string Version = "v0.5.0";
+    static readonly string Version = "v0.5.1";
     static readonly Window window = new();
     static Mode Mode = new();
     static Battle battle = new();
@@ -129,9 +129,8 @@ class Program
     internal const string CLASSIC_MODE = "Classic";
     internal const string AOS_MODE = "AgeOfSeed";
     const string STRICT = "strict";
-    const string INFER = "inference";
-    const string CUSTOM_ABIL = "CustomAbil";
-    const string CPU_DELAY = "CPUDelay";
+    const string INFER = "infer";
+
     #endregion
 
     #region methods
@@ -989,7 +988,7 @@ class Program
     static void ShowStatus()
     {
         Console.Clear();
-        ("\n" + battle.Player1.GetStatusString() + battle.Player2.GetStatusString() + $"\n現在のターン: {battle.CurrentPlayer.Name}\n\n\n\n", Yellow).WriteLine();
+        ("\n" + battle.Player1.GetStatusString() + battle.Player2.GetStatusString() + $"\n現在のターン: {battle.CurrentPlayer.Name}\n経過したターン数: {battle.TurnNum}\n\n\n\n", Yellow).WriteLine();
         ("終了するには、任意のキーを押してください. . . ", White).WriteLine();
         Console.ReadLine();
         Console.Clear();
@@ -1332,7 +1331,9 @@ class Program
        + "・s オプション  →  指定した文字列と頭文字が同じである単語を検索します。\n"
        + "・e オプション  →  指定した文字列と同じ文字で終わる単語を検索します。\n"
        + "・b オプション  →  指定した文字列と最初の文字/最後の文字がともに一致する単語を検索します。\n"
-       + "・r オプション  →  正規表現を入力し、それにマッチする単語を検索します。\n", Cyan).WriteLine();
+       + "・r オプション  →  正規表現を入力し、それにマッチする単語を検索します。\n"
+       + "・7 オプション  →  b オプションと同様の検索方法で、7文字以上のもののみ出力します。\n"
+       + "・6 オプション  →  b オプションと同様の検索方法で、6文字以上のもののみ出力します。\n", Cyan).WriteLine();
         ("続けるには、任意のキーを押してください. . . ", White).WriteLine();
         Console.ReadLine();
         Console.Clear();
@@ -1367,9 +1368,11 @@ class Program
             1 => name,
             2 => $"^{name[0]}",
             3 => $"{name[^1]}ー*$",
-            4 => $@"^{name[0]}\w*{name[^1]}ー*$",
+            4 => $@"^{name[0]}.*{name[^1]}ー*$",
             5 => name,
             6 => name,
+            7 => $@"^{name[0]}.{{5,}}{name[^1]}$|^{name[0]}.{{4,}}{name[^1]}ー$",
+            8 => $@"^{name[0]}.{{4,}}{name[^1]}$|^{name[0]}.{{3,}}{name[^1]}ー$",
             _ => name
         });
         var dic = dicOption switch
@@ -1423,6 +1426,8 @@ class Program
             "b" => (true, 4),
             "r" => (true, 5),
             "t" => (true, 6),
+            "7" => (true, 7),
+            "6" => (true, 8),
             _ => (false, 0)
         };
         return result;

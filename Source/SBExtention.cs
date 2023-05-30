@@ -162,17 +162,18 @@ internal static class SBExtention
     /// <returns>変換が成功したかどうかを表すフラグ</returns>
     public static bool TryStringToEnabler(this string str, out bool enabler)
     {
-        if (str is Program.ENABLE or "E" or "e" or "T" or "t")
+        enabler = false;
+        if (string.IsNullOrEmpty(str)) return false;
+        if (str.ToUpper()[0] is 'E' or 'T')
         {
             enabler = true;
             return true;
         }
-        if (str is Program.DISABLE or "D" or "d" or "F" or "f")
+        if (str.ToUpper()[0] is 'D' or 'F')
         {
             enabler = false;
             return true;
         }
-        enabler = false;
         return false;
     }
     /// <summary>

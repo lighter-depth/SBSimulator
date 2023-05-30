@@ -584,7 +584,6 @@ internal class HealContract : Contract
         if (Actor.Ability.Type.HasFlag(State))
         {
             Actor.Ability.Execute(this);
-            return;
         }
         if (IsCure && CanHeal)
         {

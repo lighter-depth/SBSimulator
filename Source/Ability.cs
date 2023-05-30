@@ -95,7 +95,8 @@ internal class AbilityFactory
     /// <returns>入力から推論されたとくせい</returns>
     public static Ability? Create(string name, bool allowCustomAbility)
     {
-        var subClasses = Assembly.GetAssembly(typeof(Ability))?.GetTypes().Where(x => x.IsSubclassOf(typeof(Ability)) && !x.IsAbstract).ToArray() ?? Array.Empty<Type>();
+        var subClasses = Assembly.GetAssembly(typeof(Ability))?.GetTypes()
+            .Where(x => x.IsSubclassOf(typeof(Ability)) && !x.IsAbstract).ToArray() ?? Array.Empty<Type>();
         foreach(var i in subClasses)
         {
             var sub = Activator.CreateInstance(i) as Ability;
@@ -132,6 +133,10 @@ internal abstract class Ability
     /// 攻撃力に作用させる倍率
     /// </summary>
     public virtual double Amp { get; protected set; }
+    /// <summary>
+    /// とくせい初期化時に表示するメッセージ
+    /// </summary>
+    public virtual AnnotatedString? InitMessage { get; protected set; }
 
     /// <summary>
     /// とくせいを実行します。
@@ -171,7 +176,7 @@ internal class Debugger : Ability
     public override void Execute(Contract c)
     {
         if (c is not AttackContract ac) return;
-        if (ac.Word.Type1 == Word.WordType.Empty)
+        if (ac.Word.Type1 == WordType.Empty)
             ac.BaseDmg = 13;
     }
     public override string ToString() => "デバッガー";

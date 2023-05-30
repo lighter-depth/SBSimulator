@@ -323,5 +323,5 @@ class AnnotatedString
             _ => Gray
         });
     }
-    public static implicit operator AnnotatedString((string, Notice) t) => new(t.Item1, t.Item2);
+    public static implicit operator AnnotatedString((string　text, Notice notice) t) => new(t.text, t.notice);
 }

@@ -152,6 +152,8 @@ internal abstract class CPUPlayer : Player
         }
         return false;
     }
+    // 8倍弱点以上をつける単語の検索。
+    // 挙動は後々改善予定。
     public bool TrySearchKillWord(char startChar, Word prev, [NotNullWhen(true)] out Word? word)
     {
         word = null;
@@ -234,7 +236,6 @@ internal class Itamae : CPUPlayer
     public override Ability FirstAbility => new Ikasui();
     public override string CPUName { get; set; } = "いたまえ";
     public override List<string> ReferedName => new() { "いたまえ", "s3", "S3" };
-    public override TurnProceedingArbiter Proceeding => TurnProceedingArbiter.True;
     public override string[] Execute(params int[] args)
     {
         var startchar = GetStartChar();
@@ -252,10 +253,9 @@ internal class Tsuyoshi : CPUPlayer
 {
     public override Ability FirstAbility => new Kakumei();
     public override string CPUName { get; set; } = "つよし";
-    public override List<string> ReferedName => new() { "つよし", "s11", "S11", "sa", "SA" };
+    public override List<string> ReferedName => new() { "つよし", "s11", "S11", "sb", "SB" };
     public int ViolenceUsed { get; private set; } = 0;
     public bool PlayUsed { get; private set; } = false;
-    public override TurnProceedingArbiter Proceeding => TurnProceedingArbiter.True;
     public Tsuyoshi(string name, Ability ability) : base(name, ability) { }
     public Tsuyoshi() : base() { }
     public override string[] Execute(params int[] args)

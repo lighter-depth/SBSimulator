@@ -330,8 +330,9 @@ internal class Player
     public bool TryChangeDEF(int arg, Word word)
     {
         var resultIndex = DEFIndex + arg;
-        if (resultIndex < 0 || resultIndex > playerBufCap.Length - 1) return false;
-        DEFIndex = resultIndex;
+        if (resultIndex < 0 || resultIndex == playerBufCap.Length - 1) return false;
+        else if (resultIndex >= playerBufCap.Length - 1) DEFIndex = playerBufCap.Length - 1;
+        else DEFIndex = resultIndex;
         CurrentWord = word;
         return true;
     }
