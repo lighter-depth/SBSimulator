@@ -10,8 +10,13 @@ SBSimulatorは、SBのダメージ計算や環境の構築、戦法のテスト�
 - タイプ指定機能
 - パラメーター（急所倍率、医療回数制限など）の設定
 - タイプ推論（一部頭文字のみ）
+## 紹介動画
+<a href="https://youtu.be/6GqgmnFNhos"><img width="60%" alt="SBThumbnail" src="https://github.com/lighter-depth/SBSimulator/assets/131268908/6bdbec06-27fc-472d-a391-d19e4a98f251"></a>
+## Requirement
 
-## Install
+- [.NET Runtime 7.0](https://dotnet.microsoft.com/ja-jp/download/dotnet/7.0) 以上
+
+## Installation
 [Releases](https://github.com/lighter-depth/SBSimulator/releases)にアクセスし、最新版のアプリケーションファイル(zip形式)をダウンロードしてください。
 
 実行ファイルは/bin/Release/net7.0 直下にあります。
