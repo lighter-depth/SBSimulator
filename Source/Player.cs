@@ -1,10 +1,10 @@
-﻿using static SBSimulator.Source.Word;
+﻿using static SBSimulator.Word;
 
-namespace SBSimulator.Source;
+namespace SBSimulator;
 /// <summary>
 /// プレイヤーの情報を管理するクラスです。
 /// </summary>
-internal class Player
+public class Player
 {
     #region instance properties
 
@@ -66,6 +66,7 @@ internal class Player
     /// 状態異常の情報
     /// </summary>
     public PlayerState State { get; private set; } = PlayerState.Normal;
+    public Luck Luck { get; internal set; } = Luck.Normal;
     /// <summary>
     /// プレイヤーが先攻するかどうか
     /// </summary>
@@ -198,21 +199,6 @@ internal class Player
     }
 
     /// <summary>
-    /// プレイヤーの状態異常を文字列化します。
-    /// </summary>
-    /// <returns>状態異常を表す文字列</returns>
-    public string PlayerStateToString()
-    {
-        return State switch
-        {
-            PlayerState.Poison | PlayerState.Seed => "毒, やどりぎ",
-            PlayerState.Poison => "毒",
-            PlayerState.Seed => "やどりぎ",
-            _ => "なし"
-        };
-    }
-
-    /// <summary>
     /// プレイヤーの状態を文字列として出力します。
     /// </summary>
     /// <returns>プレイヤーの状態を表す文字列</returns>
@@ -221,7 +207,7 @@ internal class Player
         var seedTurn = State.HasFlag(PlayerState.Seed) ? MaxSeedTurn - _seedCount : 0;
         var currentWordString = CurrentWord.Name == string.Empty ? "(なし)" : CurrentWord.ToString();
         return $"{Name}:\n"
-             + $"         HP:   {HP}/{MaxHP},    残り食べ物回数:    {MaxFoodCount - FoodCount}回,          状態: [{PlayerStateToString()}]\n\n"
+             + $"         HP:   {HP}/{MaxHP},    残り食べ物回数:    {MaxFoodCount - FoodCount}回,          状態: [{State.StateToString()}]\n\n"
              + $"         ATK:  {ATK}倍,      残り医療回数:    {MaxCureCount - CureCount}回,        現在の単語: {currentWordString}\n\n"
              + $"         DEF:  {DEF}倍,      毒のダメージ: {PoisonDmg}ダメージ,        とくせい: {Ability.ToString()}\n\n"
              + $"         残りとくせい変更回数: {MaxAbilChange - _changeableAbilCount}回,    残りやどりぎターン: {seedTurn}ターン\n\n";
@@ -269,7 +255,7 @@ internal class Player
     public void TakePoisonDmg()
     {
         // NOTE: ダメージ算出はかりうむ式。
-        PoisonDmg += (int)(MaxHP * 0.062);
+        PoisonDmg += (int)(MaxHP * 0.0625);
         HP -= PoisonDmg;
     }
 
@@ -389,7 +375,7 @@ internal class Player
     /// <summary>
     /// とくせい「はんしょく」の情報管理に用いる補助クラス。
     /// </summary>
-    internal class BredString
+    public  class BredString
     {
         /// <summary>
         /// 単語の名前
@@ -403,4 +389,10 @@ internal class Player
         public void Increment() => Rep++;
     }
     #endregion
+}
+public enum Luck
+{
+    Normal,
+    Lucky,
+    UnLucky
 }

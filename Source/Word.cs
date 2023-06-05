@@ -1,12 +1,12 @@
-﻿using static SBSimulator.Source.Player;
-using static SBSimulator.Source.Word.WordType;
+﻿using static SBSimulator.Player;
+using static SBSimulator.Word.WordType;
 
-namespace SBSimulator.Source;
+namespace SBSimulator;
 
 /// <summary>
 /// 単語の情報を管理するクラスです。
 /// </summary>
-internal class Word
+public class Word
 {
     #region properties
     /// <summary>

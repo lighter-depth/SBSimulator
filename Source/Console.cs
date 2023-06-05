@@ -1,11 +1,11 @@
 ﻿using static System.ConsoleColor;
-using static SBSimulator.Source.Notice;
+using static SBSimulator.Notice;
 
-namespace SBSimulator.Source;
+namespace SBSimulator;
 /// <summary>
 /// コンソール ウインドウに表示する情報を管理するクラスです。
 /// </summary>
-class Window
+public class Window
 {
     /// <summary>
     /// ウインドウ最上部に表示する情報
@@ -73,7 +73,7 @@ class Window
 /// <summary>
 /// 複数の色付き文字列を管理するためのクラスです。
 /// </summary>
-class MessageBox
+public class MessageBox
 {
     /// <summary>
     /// 空の<see cref="MessageBox"/>要素を表します。
@@ -128,7 +128,7 @@ class MessageBox
 /// <summary>
 /// ログとして保存される色付き文字列の情報を管理するクラスです。
 /// </summary>
-class MessageLog
+public class MessageLog
 {
     /// <summary>
     /// ログの本体
@@ -176,7 +176,7 @@ class MessageLog
 /// <summary>
 /// 色付き文字列を表すクラスです。
 /// </summary>
-class ColoredString
+public class ColoredString
 {
     /// <summary>
     /// 文字列の本体
@@ -282,7 +282,7 @@ public enum Notice
 /// <summary>
 /// アノテーション付き文字列を表すクラスです。
 /// </summary>
-class AnnotatedString
+public class AnnotatedString
 {
     /// <summary>
     /// アノテーションを受ける文字列

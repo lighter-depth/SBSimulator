@@ -1,11 +1,12 @@
 ﻿using System.Diagnostics.CodeAnalysis;
-using static SBSimulator.Source.Word;
+using static SBSimulator.Word;
+using static SBSimulator.SBExtention;
 
-namespace SBSimulator.Source;
+namespace SBSimulator;
 /// <summary>
 /// アクションの種類を管理するフラグです。
 /// </summary>
-internal enum ContractType
+public enum ContractType
 {
     None, 
     Attack, 
@@ -16,7 +17,7 @@ internal enum ContractType
 /// <summary>
 /// １ターンの間に起こるアクションを管理するスーパークラスです。
 /// </summary>
-internal abstract class Contract
+public abstract class Contract
 {
     #region properties
     /// <summary>
@@ -262,7 +263,7 @@ internal abstract class Contract
 /// <summary>
 /// <see cref="Contract"/>の補助的な情報を管理するクラスです。
 /// </summary>
-internal class ContractArgs
+public class ContractArgs
 {
     /// <summary>
     /// タイプ推論が成功したかどうかを表すフラグ
@@ -399,7 +400,7 @@ internal class AttackContract : Contract
     {
         State = AbilityType.CritDecided;
         if (Word.IsCritable)
-            CritFlag = new Random().Next(5) == 0;
+            CritFlag = RandomFlag(5, Actor.Luck);
         if (Actor.Ability.Type.HasFlag(State))
             Actor.Ability.Execute(this);
     }
@@ -431,7 +432,7 @@ internal class AttackContract : Contract
         // 4倍弱点 × 急所 でダメージを与えると 51 - 58 ダメージ出る。
         var critDmg = CritFlag ? Player.CritDmg : 1;
         var randomFlag = !(Actor.CurrentWord.Type1 == WordType.Empty || Receiver.CurrentWord.Type1 == WordType.Empty);
-        var random = randomFlag ? 0.85 + new Random().Next(15) * 0.01 : 1;
+        var random = randomFlag ? 0.85 + Random(15, Actor.Luck) * 0.01 : 1;
         var damage = (int)(critDmg * (int)(AmpDmg * BrdDmg * (int)(BaseDmg * PropDmg * MtpDmg * random)));
         Receiver.HP -= damage;
     }

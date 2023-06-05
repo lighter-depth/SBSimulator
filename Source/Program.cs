@@ -1,7 +1,6 @@
 ﻿using System.Text;
 using static System.ConsoleColor;
 using System.Text.RegularExpressions;
-using System.Runtime.CompilerServices;
 
 /*   ◆辞書について
  *   
@@ -59,78 +58,20 @@ using System.Runtime.CompilerServices;
 // TODO: コマンドラインのオブジェクト化(SBOrder クラス作成)
 // TODO: 即死検索メソッドの実装
 
-namespace SBSimulator.Source;
+namespace SBSimulator;
 
 class Program
 {
     #region static fields
-    static readonly string Version = "v0.5.1";
-    static readonly Window window = new();
+    static readonly string Version = "v0.5.3";
+    static readonly Window Window = new();
     static Mode Mode = new();
-    static Battle battle = new();
+    static Battle Battle = new();
     static readonly string DicDir = GetDicPath();
     static readonly string NoTypeWordsPath = DicDir + @"\no type\no-type-words.csv";
     static readonly string NoTypeWordExPath = DicDir + @"\no type\no-type-word-extension.csv";
     static readonly string TypedWordsPath = DicDir + @"\typed";
     static readonly Task DictionaryImportTask;
-    /// <summary>
-    /// <see cref="Battle"/>クラスのインスタンスに追加で渡すハンドラーの情報
-    /// </summary>
-    static Dictionary<string, Action<string[], CancellationTokenSource>> CustomFunctions => new()
-    {
-        [SHOW] = OnShowOrdered,
-        ["sh"] = OnShowOrdered,
-        [RESET] = OnResetOrdered,
-        ["rs"] = OnResetOrdered,
-        [EXIT] = OnExitOrdered,
-        ["ex"] = OnExitOrdered,
-        [HELP] = OnHelpOrdered,
-        [ADD] = __OnAddOrdered,
-        [REMOVE] = __OnRemoveOrdered,
-        [SEARCH] = __OnSearchOrdered,
-        [ERROR] = __OnErrorOrdered
-    };
-    #endregion
-
-    #region constants
-    const string EXIT = "exit";
-    const string RESET = "reset";
-    const string ACTION = "action";
-    const string CHANGE = "change";
-    const string OPTION = "option";
-    internal const string ENABLE = "enable";
-    internal const string DISABLE = "disable";
-    const string SHOW = "show";
-    const string HELP = "help";
-    const string ADD = "__add";
-    const string REMOVE = "__remove";
-    const string SEARCH = "__search";
-    const string ERROR = "__error";
-    const string WARNING = "入力が不正です。";
-    const string SET_MAX_HP = "SetMaxHP";
-    const string INFINITE_SEED = "InfiniteSeed";
-    const string INFINITE_CURE = "InfiniteCure";
-    const string ABIL_CHANGE = "AbilChange";
-    const string SET_ABIL_COUNT = "SetAbilCount";
-    const string SET_MAX_CURE_COUNT = "SetMaxCureCount";
-    const string SET_MAX_FOOD_COUNT = "SetMaxFoodCount";
-    const string SET_SEED_DMG = "SetSeedDmg";
-    const string SET_MAX_SEED_TURN = "SetMaxSeedTurn";
-    const string SET_CRIT_DMG_MULTIPLIER = "SetCritDmgMultiplier";
-    const string SET_INS_BUF_QTY = "SetInsBufQty";
-    const string SET_MODE = "SetMode";
-    const string PLAYER1 = "Player1";
-    const string PLAYER2 = "Player2";
-    const string STATUS = "status";
-    const string OPTIONS = "options";
-    const string LOG = "log";
-    const string INFO = "info";
-    internal const string DEFAULT_MODE = "Default";
-    internal const string CLASSIC_MODE = "Classic";
-    internal const string AOS_MODE = "AgeOfSeed";
-    const string STRICT = "strict";
-    const string INFER = "infer";
-
     #endregion
 
     #region methods
@@ -142,18 +83,8 @@ class Program
     {
         try
         {
-            Console.Title = "しりバトシミュレーター";
-            var (p1, p2) = SetUp();
-            Console.WriteLine("辞書を読み込み中...\n\nしばらくお待ちください...");
-            DictionaryImportTask.Wait();
-            battle = new Battle(p1, p2);
-            battle.Player1.Register(battle);
-            battle.Player2.Register(battle);
-            Mode.Set(battle);
-            battle.OnReset += Reset;
-            battle.In = () => Console.ReadLine()?.Trim().Split() ?? Array.Empty<string>();
-            battle.Out = Output;
-            battle.Run(CustomFunctions);
+            Initialize();
+            Battle.Run();
             OnExitApp();
         }
         catch (Exception exc)
@@ -167,47 +98,86 @@ class Program
             Console.ReadLine();
         }
     }
-    #region handlers
-    static void OnShowOrdered(object sender, CancellationTokenSource cts)
+    static void Initialize()
     {
-        var orderline = (string[])sender;
-        if (orderline.Length != 2)
+        Console.Title = "しりバトシミュレーター";
+        var (p1, p2) = SetUp();
+        Console.WriteLine("辞書を読み込み中...\n\nしばらくお待ちください...");
+        DictionaryImportTask.Wait();
+        Battle = new Battle(p1, p2);
+        Battle.Player1.Register(Battle);
+        Battle.Player2.Register(Battle);
+        Mode.Set(Battle);
+        Battle.OnShowOrdered += OnShowOrdered;
+        Battle.OnResetOrdered += OnResetOrdered;
+        Battle.OnExitOrdered += OnExitOrdered;
+        Battle.OnHelpOrdered += OnHelpOrdered;
+        Battle.OnAddOrdered += OnAddOrdered;
+        Battle.OnRemoveOrdered += OnRemoveOrdered;
+        Battle.OnSearchOrdered += OnSearchOrdered;
+        Battle.OnReset += Reset;
+        Battle.In = () => Order.Parse(Console.ReadLine()?.Trim().Split() ?? Array.Empty<string>(), Battle);
+        Battle.Out = Output;
+    }
+    #region handlers
+    static void OnShowOrdered(Order order, CancellationTokenSource cts)
+    {
+        if (order.ErrorMessage is not null)
         {
-            Warn();
+            Warn(order.ErrorMessage);
             return;
         }
-        if (orderline[1] is not (STATUS or OPTIONS or LOG or INFO or "s" or "o" or "l" or "i"))
+        var key = order.Body.ElementAtOrDefault(0);
+        if (key is not ('s' or 'o' or 'l' or 'i'))
         {
-            Warn($"表示する情報 {orderline[1]} が見つかりません。");
+            Warn($"表示する情報 {order.Body} が見つかりません。");
             return;
         }
-        if (orderline[1] is STATUS or "s")
+        if (key is 's')
         {
             ShowStatus();
         }
-        else if (orderline[1] is OPTIONS or "o")
+        else if (key is 'o')
         {
             ShowOptions();
         }
-        else if (orderline[1] is LOG or "l")
+        else if (key is 'l')
         {
             ShowLog();
         }
-        else if (orderline[1] is INFO or "i")
+        else if (key is 'i')
         {
             ShowInfo();
         }
     }
-    static void OnResetOrdered(object sender, CancellationTokenSource cts)
+    static void OnResetOrdered(Order order, CancellationTokenSource cts)
     {
         Reset(cts);
     }
-    static void OnExitOrdered(object sender, CancellationTokenSource cts)
+    static void OnExitOrdered(Order order, CancellationTokenSource cts)
     {
         cts.Cancel();
     }
-    static void OnHelpOrdered(object sender, CancellationTokenSource cts)
+    static void OnHelpOrdered(Order order, CancellationTokenSource cts)
     {
+        #region constants
+        const string EXIT = "exit";
+        const string RESET = "reset";
+        const string ACTION = "action";
+        const string CHANGE = "change";
+        const string OPTION = "option";
+        const string ENABLE = "enable";
+        const string DISABLE = "disable";
+        const string SHOW = "show";
+        const string HELP = "help";
+        const string PLAYER1 = "Player1";
+        const string PLAYER2 = "Player2";
+        const string STATUS = "status";
+        const string OPTIONS = "options";
+        const string LOG = "log";
+        const string INFO = "info";
+        #endregion
+
         while (true)
         {
             Console.Clear();
@@ -244,12 +214,12 @@ class Program
                         ($"(例): しっぺ JV     →   しっぺ(遊び / 暴力) で相手に攻撃する\n"
                          + $"      もなりざ C　  →   もなりざ(芸術) で自分にバフをかける(とくせいが「ロックンロール」の場合)\n"
                          + $"      いぺ Y        →   いぺ(植物) で相手にやどりぎを植え付ける (とくせいが「やどりぎ」の場合)\n", Cyan).WriteLine();
-                        ($"また、{INFER} オプションが有効な場合には、一部タイプ名の省略が可能です。\n", Yellow).WriteLine();
+                        ($"また、{nameof(Options.Infer)} オプションが有効な場合には、一部タイプ名の省略が可能です。\n", Yellow).WriteLine();
                         ($"(例): るいざ   →    るいざ CK\n", Cyan).WriteLine();
                         ($"・ワイルドカード\n", Yellow).WriteLine();
                         ($"{ACTION} コマンド中の「単語名」パラメーター中に、アスタリスク記号 (\"", Yellow).Write();
                         (" * ", Green).Write();
-                        ($"\") を含めることで、\n{INFER} オプションや{STRICT} オプションによる制限を軽減することができます。\n", Yellow).WriteLine();
+                        ($"\") を含めることで、\n{nameof(Options.Infer)} オプションや{nameof(Options.Strict)} オプションによる制限を軽減することができます。\n", Yellow).WriteLine();
                         ("(例): あ*****ぞ D  →   「あ」で始まり「ぞ」で終わる、7文字の虫タイプの単語", Cyan).WriteLine();
                         ("　    お***** JG   →   「お」で始まり6文字の、遊び・地名複合タイプの単語", Cyan).WriteLine();
                         ("　    * F          →    任意の文字を受け付け、任意の文字に使用できる、1文字の食べ物タイプの単語\n", Cyan).WriteLine();
@@ -273,7 +243,7 @@ class Program
                         Console.Clear();
                         ("・その他のコマンドの使い方\n\n" + "他に、以下のようなコマンドが使用可能です。\n", Yellow).WriteLine();
                         ($"・{OPTION} コマンド\n\n  オプションを指定します。\n  詳しくは [ヘルプ] > [オプションの一覧] をご参照ください。\n", Yellow).WriteLine();
-                        ($"(例): {OPTION} {INFINITE_SEED} {ENABLE}\n", Cyan).WriteLine();
+                        ($"(例): {OPTION} {nameof(Options.InfiniteSeed)} {ENABLE}\n", Cyan).WriteLine();
                         ($"・{RESET} コマンド\n\n  アプリケーションをリセットします。\n", Yellow).WriteLine();
                         ($"(例): {RESET}\n", Cyan).WriteLine();
                         ($"・{EXIT} コマンド\n\n  アプリケーションを終了します。\n", Yellow).WriteLine();
@@ -307,7 +277,7 @@ class Program
                         ("また、複合タイプは以下のように入力します。\n", Yellow).WriteLine();
                         ("(例): るーじゅばっく AU  → るーじゅばっく(動物 / スポーツ) の意味\n"
                             + "      いっこういっき SV → いっこういっき (社会 / 暴力) の意味\n", Cyan).WriteLine();
-                        ($"タイプを何も指定せずに入力すると、{INFER} オプションが有効な場合にはその単語から推論されるタイプが、\nそうでない場合には「無属性」が設定されます。\n", Yellow).WriteLine();
+                        ($"タイプを何も指定せずに入力すると、{nameof(Options.Infer)} オプションが有効な場合にはその単語から推論されるタイプが、\nそうでない場合には「無属性」が設定されます。\n", Yellow).WriteLine();
                         ("...続けるには任意のキーを押してください...", White).WriteLine();
                         Console.ReadLine();
                         break;
@@ -344,57 +314,72 @@ class Program
                        + "現在、全部で１４種類のオプションを設定可能です。そのいずれも、次のように入力します。\n", Yellow).WriteLine();
                         ($"{OPTION} [オプション名] {{オプションのパラメーター}}\n", Green).WriteLine();
                         ("設定可能なオプション、及びその入力の仕方は以下の通りです。\n\n", Yellow).WriteLine();
-                        ($"・{SET_MAX_HP} オプション\n  指定したプレイヤーの最大HPを設定します。\n", Yellow).WriteLine();
-                        ($"(例): {OPTION} {SET_MAX_HP} じぶん 40   → 「じぶん」という名前のプレイヤーの最大HPを 40 に設定する\n", Cyan).WriteLine();
-                        ($"・{INFINITE_SEED} オプション\n  やどりぎの継続ターン数が無限かどうかを設定します。\n"
+                        ($"・{nameof(Options.SetMaxHP)} オプション\n  指定したプレイヤーの最大HPを設定します。\n", Yellow).WriteLine();
+                        ($"(例): {OPTION} {nameof(Options.SetMaxHP)} じぶん 40   → 「じぶん」という名前のプレイヤーの最大HPを 40 に設定する\n", Cyan).WriteLine();
+                        ($"・{nameof(Options.InfiniteSeed)} オプション\n  やどりぎの継続ターン数が無限かどうかを設定します。\n"
                        + $"  パラメーター \"{ENABLE}\" を選択すると有効に、\"{DISABLE}\" を選択すると無効になります。\n", Yellow).WriteLine();
-                        ($"(例): {OPTION} {INFINITE_SEED} {ENABLE}   → やどりぎの継続ターン数を無限に設定する\n", Cyan).WriteLine();
-                        ($"・{INFINITE_CURE} オプション\n  医療タイプの単語で回復可能な回数が無限かどうかを設定します。\n"
+                        ($"(例): {OPTION} {nameof(Options.InfiniteSeed)} {ENABLE}   → やどりぎの継続ターン数を無限に設定する\n", Cyan).WriteLine();
+                        ($"・{nameof(Options.InfiniteCure)} オプション\n  医療タイプの単語で回復可能な回数が無限かどうかを設定します。\n"
                        + $"  パラメーター \"{ENABLE}\" を選択すると有効に、\"{DISABLE}\" を選択すると無効になります。\n", Yellow).WriteLine();
-                        ($"(例): {OPTION} {INFINITE_CURE} {DISABLE}   → 医療タイプの単語で回復可能な回数を有限(デフォルトでは５回)に設定する\n", Cyan).WriteLine();
+                        ($"(例): {OPTION} {nameof(Options.InfiniteCure)} {DISABLE}   → 医療タイプの単語で回復可能な回数を有限(デフォルトでは５回)に設定する\n", Cyan).WriteLine();
                         ("...続けるには任意のキーを押してください...", White).WriteLine();
                         Console.ReadLine();
                         Console.Clear();
-                        ($"・{ABIL_CHANGE} オプション\n  とくせいが変更可能かどうかを設定します。\n"
+                        ($"・{nameof(Options.AbilChange)} オプション\n  とくせいが変更可能かどうかを設定します。\n"
                        + $"  パラメーター \"{ENABLE}\" を選択すると有効に、\"{DISABLE}\" を選択すると無効になります。\n", Yellow).WriteLine();
-                        ($"(例): {OPTION} {ABIL_CHANGE} {DISABLE}   → とくせいの変更を不可能に設定する\n", Cyan).WriteLine();
-                        ($"・{SET_ABIL_COUNT} オプション\n  とくせいの変更可能な回数を設定します。\n", Yellow).WriteLine();
-                        ($"(例): {OPTION} {SET_ABIL_COUNT} 5   → とくせいの変更可能な回数を５回に設定する\n", Cyan).WriteLine();
-                        ($"・{SET_MAX_CURE_COUNT} オプション\n  医療タイプの単語で回復可能な回数を設定します。\n", Yellow).WriteLine();
-                        ($"(例): {OPTION} {SET_MAX_CURE_COUNT} 3   → 医療タイプの単語で回復可能な回数を３回に設定する\n", Cyan).WriteLine();
-                        ($"・{SET_MAX_FOOD_COUNT} オプション\n  食べ物タイプの単語で回復可能な回数を設定します。\n", Yellow).WriteLine();
-                        ($"(例): {OPTION} {SET_MAX_FOOD_COUNT} 6   → 食べ物タイプの単語で回復可能な回数を６回に設定する\n", Cyan).WriteLine();
+                        ($"(例): {OPTION} {nameof(Options.AbilChange)} {DISABLE}   → とくせいの変更を不可能に設定する\n", Cyan).WriteLine();
+                        ($"・{nameof(Options.SetAbilCount)} オプション\n  とくせいの変更可能な回数を設定します。\n", Yellow).WriteLine();
+                        ($"(例): {OPTION} {nameof(Options.SetAbilCount)} 5   → とくせいの変更可能な回数を５回に設定する\n", Cyan).WriteLine();
+                        ($"・{nameof(Options.SetMaxCureCount)} オプション\n  医療タイプの単語で回復可能な回数を設定します。\n", Yellow).WriteLine();
+                        ($"(例): {OPTION} {nameof(Options.SetMaxCureCount)} 3   → 医療タイプの単語で回復可能な回数を３回に設定する\n", Cyan).WriteLine();
+                        ($"・{nameof(Options.SetMaxFoodCount)} オプション\n  食べ物タイプの単語で回復可能な回数を設定します。\n", Yellow).WriteLine();
+                        ($"(例): {OPTION} {nameof(Options.SetMaxFoodCount)} 6   → 食べ物タイプの単語で回復可能な回数を６回に設定する\n", Cyan).WriteLine();
                         ("...続けるには任意のキーを押してください...", White).WriteLine();
                         Console.ReadLine();
                         Console.Clear();
-                        ($"・{SET_SEED_DMG} オプション\n  やどりぎによるダメージを設定します。\n", Yellow).WriteLine();
-                        ($"(例): {OPTION} {SET_SEED_DMG} 5   → やどりぎのダメージを５に設定する\n", Cyan).WriteLine();
-                        ($"・{SET_MAX_SEED_TURN} オプション\n  やどりぎの継続ターン数を設定します。\n", Yellow).WriteLine();
-                        ($"(例): {OPTION} {SET_MAX_SEED_TURN} 10   → やどりぎの継続ターン数を１０ターンに設定する\n", Cyan).WriteLine();
-                        ($"・{SET_CRIT_DMG_MULTIPLIER} オプション\n  急所によるダメージ倍率を設定します。\n", Yellow).WriteLine();
-                        ($"(例): {OPTION} {SET_CRIT_DMG_MULTIPLIER} 2.5   → 急所によるダメージ倍率を２.５倍に設定する\n", Cyan).WriteLine();
-                        ($"・{SET_INS_BUF_QTY} オプション\n  ほけん発動によって何段階攻撃力が変化するかを設定します。\n", Yellow).WriteLine();
-                        ($"(例): {OPTION} {SET_INS_BUF_QTY} 4   → ほけん発動による攻撃力の変化をを４段階に設定する\n", Cyan).WriteLine();
+                        ($"・{nameof(Options.SetSeedDmg)} オプション\n  やどりぎによるダメージを設定します。\n", Yellow).WriteLine();
+                        ($"(例): {OPTION} {nameof(Options.SetSeedDmg)} 5   → やどりぎのダメージを５に設定する\n", Cyan).WriteLine();
+                        ($"・{nameof(Options.SetMaxSeedTurn)} オプション\n  やどりぎの継続ターン数を設定します。\n", Yellow).WriteLine();
+                        ($"(例): {OPTION} {nameof(Options.SetMaxSeedTurn)} 10   → やどりぎの継続ターン数を１０ターンに設定する\n", Cyan).WriteLine();
+                        ($"・{nameof(Options.SetCritDmgMultiplier)} オプション\n  急所によるダメージ倍率を設定します。\n", Yellow).WriteLine();
+                        ($"(例): {OPTION} {nameof(Options.SetCritDmgMultiplier)} 2.5   → 急所によるダメージ倍率を２.５倍に設定する\n", Cyan).WriteLine();
+                        ($"・{nameof(Options.SetInsBufQty)} オプション\n  ほけん発動によって何段階攻撃力が変化するかを設定します。\n", Yellow).WriteLine();
+                        ($"(例): {OPTION} {nameof(Options.SetInsBufQty)} 4   → ほけん発動による攻撃力の変化をを４段階に設定する\n", Cyan).WriteLine();
                         ("...続けるには任意のキーを押してください...", White).WriteLine();
                         Console.ReadLine();
                         Console.Clear();
-                        ($"・{STRICT} オプション\n  有効にすると、厳密なしりとりのルールが適用されます。\n"
+                        ($"・{nameof(Options.Strict)} オプション\n  有効にすると、厳密なしりとりのルールが適用されます。\n"
                         + "  具体的には、以下の機能が有効になります。\n\n" + "・開始文字がマッチしない単語の禁止\n\n"
                         + "・「ん」で終わる単語の禁止\n\n"
                         + "・すでに使われた単語の再使用禁止\n\n"
-                        + $"  パラメーター \"{ENABLE}\" を選択すると有効に、\"{DISABLE}\" を選択すると無効になります。\n", Yellow).WriteLine();
-                        ($"(例): {OPTION} {STRICT} {ENABLE}   → ストリクトモードを有効にする\n", Cyan).WriteLine();
-                        ($"・{INFER} オプション\n  タイプ推論を行うかどうかを設定します。\n  有効にすると、一部の単語についてタイプが自動的に決定されます。\n"
+                        + $"  パラメーター \"{ENABLE}\" を選択すると有効に、\"disable\" を選択すると無効になります。\n", Yellow).WriteLine();
+                        ($"(例): {OPTION} {nameof(Options.Strict)} {ENABLE}   → ストリクトモードを有効にする\n", Cyan).WriteLine();
+                        ($"・{nameof(Options.Infer)} オプション\n  タイプ推論を行うかどうかを設定します。\n  有効にすると、一部の単語についてタイプが自動的に決定されます。\n"
                         + "  また、辞書にない単語を使用できなくなります。\n"
-                        + $"  パラメーター \"{ENABLE}\" を選択すると有効に、\"{DISABLE}\" を選択すると無効になります。\n", Yellow).WriteLine();
-                        ($"(例): {OPTION} {INFER} {ENABLE}   → タイプの推論を有効にする\n", Cyan).WriteLine();
+                        + $"  パラメーター \"{ENABLE}\" を選択すると有効に、\"disable\" を選択すると無効になります。\n", Yellow).WriteLine();
+                        ($"(例): {OPTION} {nameof(Options.Infer)} {ENABLE}   → タイプの推論を有効にする\n", Cyan).WriteLine();
                         ("...続けるには任意のキーを押してください...", White).WriteLine();
                         Console.ReadLine();
                         Console.Clear();
-                        ($"・{SET_MODE} オプション\n  複数のオプションをまとめて変更します。\n"
-                            + "  パラメーターにはモード名を指定できます。\n", Yellow).WriteLine();
-                        ($"(例): {OPTION} {SET_MODE} {CLASSIC_MODE}   → モードを {CLASSIC_MODE} に設定する\n", Cyan).WriteLine();
+                        ($"・{nameof(Options.SetMode)} オプション\n  複数のオプションをまとめて変更します。\n"
+                        + "  パラメーターにはモード名を指定できます。\n", Yellow).WriteLine();
+                        ($"(例): {OPTION} {nameof(Options.SetMode)} Classic   → モードを Classic に設定する\n", Cyan).WriteLine();
+                        ($"・{nameof(Options.SetHP)} オプション\n  指定したプレイヤーの体力を設定します。\n", Yellow).WriteLine();
+                        ($"(例): {OPTION} {nameof(Options.SetHP)} あいて 30   → 「あいて」という名前のプレイヤーのHPを 30 に設定する\n", Cyan).WriteLine();
                         ("設定可能なモードの一覧については、[ヘルプ] > [モードの設定方法] もご参照ください。\n", Yellow).WriteLine();
+                        ($"・{nameof(Options.SetLuck)} オプション\n  指定したプレイヤーの運を設定します。\n"
+                            + "  パラメーターには「lucky」「normal」「unlucky」のいずれかを設定できます。\n", Yellow).WriteLine();
+                        ($"(例): {OPTION} {nameof(Options.SetLuck)} じぶん lucky   → 「じぶん」という名前のプレイヤーの運をを 「Lucky」 に設定する\n", Cyan).WriteLine();
+                        ("設定可能なモードの一覧については、[ヘルプ] > [モードの設定方法] もご参照ください。\n", Yellow).WriteLine();
+                        ("...続けるには任意のキーを押してください...", White).WriteLine();
+                        Console.ReadLine();
+                        Console.Clear();
+                        ($"・{nameof(Options.CustomAbil)} オプション\n  有効にすると、カスタム特性が使用可能になります。\n"
+                       + $"  パラメーター \"{ENABLE}\" を選択すると有効に、\"{DISABLE}\" を選択すると無効になります。\n", Yellow).WriteLine();
+                        ($"(例): {OPTION} {nameof(Options.CustomAbil)} {ENABLE}   → カスタム特性を有効にする\n", Cyan).WriteLine();
+                        ($"・{nameof(Options.CPUDelay)} オプション\n  CPUの待ち時間が有効かどうかを設定します。\n  有効にすると、CPUの行動時間が一定になります。\n"
+                        + $"  パラメーター \"{ENABLE}\" を選択すると有効に、\"{DISABLE}\" を選択すると無効になります。\n", Yellow).WriteLine();
+                        ($"(例): {OPTION} {nameof(Options.CPUDelay)} {ENABLE}   → CPUの待ち時間を有効にする\n", Cyan).WriteLine();
                         ("...続けるには任意のキーを押してください...", White).WriteLine();
                         Console.ReadLine();
                         break;
@@ -406,11 +391,12 @@ class Program
                             + "具体的な一覧は以下の通りです。\n", Yellow).WriteLine();
                         ($"{CHANGE}: ch     {OPTION}: op     {SHOW}: sh     {RESET}: rs     {EXIT}: ex\n\n"
                        + $"{PLAYER1}: p1    {PLAYER2}: p2    {ENABLE}: e    {DISABLE}: d\n\n"
-                       + $"{SET_MAX_HP}: smh   {INFINITE_SEED}: is    {INFINITE_CURE}: ic    {ABIL_CHANGE}: ac\n\n"
-                       + $"{SET_ABIL_COUNT}: sac  {SET_MAX_CURE_COUNT}: smc   {SET_MAX_FOOD_COUNT}: smf\n\n"
-                       + $"{SET_SEED_DMG}: ssd   {SET_MAX_SEED_TURN}: sms   {SET_CRIT_DMG_MULTIPLIER}: scd\n\n"
-                       + $"{SET_INS_BUF_QTY}: sib  {SET_MODE}: sm  {STRICT}: s   {INFER}: i\n\n"
-                       + $"{DEFAULT_MODE}: d   {CLASSIC_MODE}; c   {AOS_MODE}: s\n\n"
+                       + $"{nameof(Options.SetMaxHP)}: smh   {nameof(Options.InfiniteSeed)}: is    {nameof(Options.InfiniteCure)}: ic    {nameof(Options.AbilChange)}: ac\n\n"
+                       + $"{nameof(Options.SetAbilCount)}: sac  {nameof(Options.SetMaxCureCount)}: smc   {nameof(Options.SetMaxFoodCount)}: smf\n\n"
+                       + $"{nameof(Options.SetSeedDmg)}: ssd   {nameof(Options.SetMaxSeedTurn)}: sms   {nameof(Options.SetCritDmgMultiplier)}: scd\n\n"
+                       + $"{nameof(Options.SetInsBufQty)}: sib  {nameof(Options.SetMode)}: sm  {nameof(Options.Strict)}: s   {nameof(Options.Infer)}: i\n\n"
+                       + $"{nameof(Options.CustomAbil)}: ca    {nameof(Options.CPUDelay)}: cd   {nameof(Options.SetHP)}: sh  {nameof(Options.SetLuck)}: sl\n\n"
+                       + $"Default: d   Classic; c   AgeOfSeed: s\n\n"
                        + $"{STATUS}: s     {OPTIONS}: o    {LOG}: l    {INFO}: i\n\n\n  ", Cyan).WriteLine();
                         ("...続けるには任意のキーを押してください...", White).WriteLine();
                         Console.ReadLine();
@@ -421,17 +407,17 @@ class Program
                         ("・モードの設定方法について\n", Yellow).WriteLine();
                         ("モードとは、最大体力や医療制限の設定、先手後手の設定、やどりぎの設定など、\n"
                       +  "複数のオプションを一括して管理する仕組みを表します。\n\n"
-                      + $"モードの設定・変更は、起動直後のモード設定、及び {OPTION} コマンドの {SET_MODE} パラメーターを\n"
+                      + $"モードの設定・変更は、起動直後のモード設定、及び {OPTION} コマンドの {nameof(Options.SetMode)} パラメーターを\n"
                       + "使用することで行うことができます。\n\n"
                       + "設定可能なモードは以下の通りです。\n", Yellow).WriteLine();
                         ("・ランダムマッチ系のモード\n", Yellow).WriteLine();
                         ("ランダムマッチで使用可能・及び使用可能だったルールを再現したモードです。", Yellow).WriteLine();
                         ("それぞれ、固有のシンボルを用いて参照します。\n", Yellow).WriteLine();
-                        ($"・{DEFAULT_MODE} モード\n  現環境のモード。体力上限６０、とくせい変更３回、医療５回、やどりぎ４ターン。", Yellow).WriteLine();
+                        ($"・Default モード\n  現環境のモード。体力上限６０、とくせい変更３回、医療５回、やどりぎ４ターン。", Yellow).WriteLine();
                         ("  参照名: \"Default\", \"d\" など\n", Yellow).WriteLine();
-                        ($"・{CLASSIC_MODE} モード\n  旧環境のモード。体力上限５０、とくせい変更ナシ、医療・やどりぎ無限。", Yellow).WriteLine();
+                        ($"・Classic モード\n  旧環境のモード。体力上限５０、とくせい変更ナシ、医療・やどりぎ無限。", Yellow).WriteLine();
                         ("  参照名: \"Classic\", \"c\" など\n", Yellow).WriteLine();
-                        ($"・{AOS_MODE} モード\n  やどりぎ環境のモード。体力上限６０、とくせい変更３回、医療５回、やどりぎ無限。", Yellow).WriteLine();
+                        ($"・AgeOfSeed モード\n  やどりぎ環境のモード。体力上限６０、とくせい変更３回、医療５回、やどりぎ無限。", Yellow).WriteLine();
                         ("  参照名: \"AgeOfSeed\", \"s\" など\n", Yellow).WriteLine();
                         ("...続けるには任意のキーを押してください...", White).WriteLine();
                         Console.ReadLine();
@@ -439,13 +425,13 @@ class Program
                         ("・ストーリー モード\n", Yellow).WriteLine();
                         ("ストーリーに登場するステージの環境を再現したモードです。", Yellow).WriteLine();
                         ("参照する際は、「StoryX」あるいは「sX」(Xはステージ番号)というようにして参照します。\n", Yellow).WriteLine();
-                        ($"(例): {OPTION} {SET_MODE} s11\n", Cyan).WriteLine();
+                        ($"(例): {OPTION} {nameof(Options.SetMode)} s11\n", Cyan).WriteLine();
                         ("・カスタム モード\n", Yellow).WriteLine();
                         ("起動直後のモード設定でのみ参照可能なモード名です。", Yellow).WriteLine();
                         ("細かい設定を手動で調整することができます。\n", Yellow).WriteLine();
                         ("参照名: \"Custom\", \"cs\"\n", Yellow).WriteLine();
                         ("・先攻指定付きデフォルトモード\n", Yellow).WriteLine();
-                        ($"{DEFAULT_MODE}モードと同じステージ条件で、どちらのプレイヤーが先攻するかを\n指定することができます。\n", Yellow).WriteLine();
+                        ($"Default モードと同じステージ条件で、どちらのプレイヤーが先攻するかを\n指定することができます。\n", Yellow).WriteLine();
                         ("参照名: \"p1\"(プレイヤー１が先攻する場合), \"p2\"(プレイヤー２が先攻する場合)\n\n", Yellow).WriteLine();
                         ("...続けるには任意のキーを押してください...", White).WriteLine();
                         Console.ReadLine();
@@ -547,11 +533,11 @@ class Program
     {
         Console.Clear();
         ("しりとりバトルシミュレーターへようこそ。", Yellow).WriteLine();
-        ($"モードの名前を入力してください。(デフォルトでは{DEFAULT_MODE} モードになります)", Yellow).WriteLine();
+        ($"モードの名前を入力してください。(デフォルトでは Default モードになります)", Yellow).WriteLine();
         var modeOrder = Console.ReadLine();
         if (modeOrder?.ToUpper() is "CUSTOM" or "CS") return SetUpCustomMode();
         var (mode, modeName) = ModeFactory.Create(modeOrder);
-        if (mode is null) (mode, modeName) = (new(), DEFAULT_MODE);
+        if (mode is null) (mode, modeName) = (new(), "Default");
         Mode = mode;
         ($"モードを {modeName} に設定しました。", Green).WriteLine();
         if (mode.IsStoryMode) return SetUpStoryMode();
@@ -561,7 +547,7 @@ class Program
     static (Player, Player) SetUpMatchMode()
     {
         Player? p1, p2;
-        var NGNamesList = new[] { "p1", "p2", PLAYER1, PLAYER2 };
+        var NGNamesList = new[] { "p1", "p2", "Player1", "Player2" };
         string? p1Name, p2Name;
         string? p1Type, p2Type;
         bool isP1Human, isP2Human;
@@ -690,7 +676,7 @@ class Program
     static (Player, Player) SetUpStoryMode()
     {
         Player? p1, p2;
-        var NGNamesList = new[] { "p1", "p2", PLAYER1, PLAYER2 };
+        var NGNamesList = new[] { "p1", "p2", "Player1", "Player2" };
         string? p1Name, p2Name;
         const string DEFAULT_P1_NAME = "じぶん";
         ($"プレイヤーの名前を入力してください。(デフォルトでは「{DEFAULT_P1_NAME}」です)", Yellow).WriteLine();
@@ -737,7 +723,7 @@ class Program
     {
         ($"モードを カスタム に設定しました。", Green).WriteLine();
         Player? p1, p2;
-        var NGNamesList = new[] { "p1", "p2", PLAYER1, PLAYER2 };
+        var NGNamesList = new[] { "p1", "p2", "Player1", "Player2" };
         string? p1Name, p2Name;
         string? p1Type, p2Type;
         bool isP1Human, isP2Human;
@@ -908,15 +894,15 @@ class Program
     /// </summary>
     static void Reset(CancellationTokenSource cts)
     {
-        window.Message.Append("やり直す？", Yellow);
-        window.Message.Append(string.Empty);
-        window.Message.Append("やり直す！ → r キーを入力", Yellow);
-        window.Message.Append("ログを表示 → l キーを入力", Yellow);
-        window.Message.Append("もうやめる！ → q キーを入力", Yellow);
+        Window.Message.Append("やり直す？", Yellow);
+        Window.Message.Append(string.Empty);
+        Window.Message.Append("やり直す！ → r キーを入力", Yellow);
+        Window.Message.Append("ログを表示 → l キーを入力", Yellow);
+        Window.Message.Append("もうやめる！ → q キーを入力", Yellow);
         while (true)
         {
             Refresh();
-            window.WriteLine();
+            Window.WriteLine();
             var order = Console.ReadLine() ?? string.Empty;
             if (order == "q")
             {
@@ -929,8 +915,8 @@ class Program
                 cts.Cancel();
                 ShowLog();
                 Console.Clear();
-                window.Message.Clear();
-                window.Message.Log.Clear();
+                Window.Message.Clear();
+                Window.Message.Log.Clear();
                 Main();
                 break;
             }
@@ -938,8 +924,8 @@ class Program
             {
                 cts.Cancel();
                 Console.Clear();
-                window.Message.Clear();
-                window.Message.Log.Clear();
+                Window.Message.Clear();
+                Window.Message.Log.Clear();
                 Main();
                 break;
             }
@@ -954,33 +940,33 @@ class Program
         foreach (var msg in msgs)
         {
             if (msg.IsLog)
-                window.Message.Log.Append((ColoredString)msg);
+                Window.Message.Log.Append((ColoredString)msg);
             else
             {
-                window.Message.Append((ColoredString)msg);
-                window.Message.Log.Append((ColoredString)msg);
+                Window.Message.Append((ColoredString)msg);
+                Window.Message.Log.Append((ColoredString)msg);
             }
         }
         Refresh();
-        window.WriteLine();
+        Window.WriteLine();
     }
     /// <summary>
-    /// <see cref="Window"/>を初期化します。
+    /// <see cref="SBSimulator.Window"/>を初期化します。
     /// </summary>
     static void Refresh()
     {
-        window.StatusFieldPlayer1 = $"{battle.Player1.Name}: {battle.Player1.HP}/{battle.Player1.MaxHP}";
-        window.StatusFieldPlayer2 = $"{battle.Player2.Name}: {battle.Player2.HP}/{battle.Player2.MaxHP}";
-        window.WordFieldPlayer1 = $"{battle.Player1.Name}:\n       {battle.Player1.CurrentWord}";
-        window.WordFieldPlayer2 = $"{battle.Player2.Name}:\n       {battle.Player2.CurrentWord}";
+        Window.StatusFieldPlayer1 = $"{Battle.Player1.Name}: {Battle.Player1.HP}/{Battle.Player1.MaxHP}";
+        Window.StatusFieldPlayer2 = $"{Battle.Player2.Name}: {Battle.Player2.HP}/{Battle.Player2.MaxHP}";
+        Window.WordFieldPlayer1 = $"{Battle.Player1.Name}:\n       {Battle.Player1.CurrentWord}";
+        Window.WordFieldPlayer2 = $"{Battle.Player2.Name}:\n       {Battle.Player2.CurrentWord}";
     }
     /// <summary>
     /// 警告を表示します。
     /// </summary>
     /// <param name="s">警告のメッセージ</param>
-    static void Warn(string s = WARNING)
+    static void Warn(string s = "入力が不正です")
     {
-        window.Message.Append(s, Red);
+        Window.Message.Append(s, Red);
     }
     /// <summary>
     /// プレイヤーのステータスを表示します。
@@ -988,7 +974,7 @@ class Program
     static void ShowStatus()
     {
         Console.Clear();
-        ("\n" + battle.Player1.GetStatusString() + battle.Player2.GetStatusString() + $"\n現在のターン: {battle.CurrentPlayer.Name}\n経過したターン数: {battle.TurnNum}\n\n\n\n", Yellow).WriteLine();
+        ("\n" + Battle.Player1.GetStatusString() + Battle.Player2.GetStatusString() + $"\n現在のターン: {Battle.CurrentPlayer.Name}\n経過したターン数: {Battle.TurnNum}\n\n\n\n", Yellow).WriteLine();
         ("終了するには、任意のキーを押してください. . . ", White).WriteLine();
         Console.ReadLine();
         Console.Clear();
@@ -999,17 +985,17 @@ class Program
     static void ShowOptions()
     {
         Console.Clear();
-        ($"\n{INFINITE_SEED}:      {battle.IsSeedInfinite}                     CustomAbilities:   {battle.IsCustomAbilUsable}\n\n"
-         + $"{INFINITE_CURE}:      {battle.IsCureInfinite}                     CPUDelay:          {battle.IsCPUDelayEnabled}\n\n"
-         + $"Strict Mode:       {battle.IsStrict}\n\n"
-         + $"Type Inference:    {battle.IsInferable}\n\n"
+        ($"\n{nameof(Options.InfiniteSeed)}:      {Battle.IsSeedInfinite}                     CustomAbilities:   {Battle.IsCustomAbilUsable}\n\n"
+         + $"{nameof(Options.InfiniteCure)}:      {Battle.IsCureInfinite}                     CPUDelay:          {Battle.IsCPUDelayEnabled}\n\n"
+         + $"Strict Mode:       {Battle.IsStrict}\n\n"
+         + $"Type Inference:    {Battle.IsInferable}\n\n"
          + $"MaxCureCount:      {Player.MaxCureCount}回\n\n"
          + $"MaxFoodCount:      {Player.MaxFoodCount}回\n\n"
          + $"SeedDamage:        {Player.SeedDmg}\n\n"
          + $"MaxSeedTurn:       {Player.MaxSeedTurn}\n\n"
          + $"InsBufQuantity:    {Player.InsBufQty}段階\n\n"
          + $"CritDamageMultiplier:      {Player.CritDmg}倍\n\n"
-         + $"ChangeableAbility:         {battle.IsAbilChangeable}\n\n"
+         + $"ChangeableAbility:         {Battle.IsAbilChangeable}\n\n"
          + $"ChangeableAbilityCount:    {Player.MaxAbilChange}回\n\n", Yellow).WriteLine();
         ("終了するには、任意のキーを押してください. . . ", White).WriteLine();
         Console.ReadLine();
@@ -1040,14 +1026,14 @@ class Program
     {
         Console.Clear();
         var height = Console.WindowHeight - 13;
-        if (window.Message.Log.Content.Count > height)
+        if (Window.Message.Log.Content.Count > height)
         {
             var logList = new List<MessageLog>();
-            var numOfPages = window.Message.Log.Content.Count / height + 1;
+            var numOfPages = Window.Message.Log.Content.Count / height + 1;
             for (var i = 0; i < numOfPages; i++)
             {
                 var page = new MessageLog();
-                page.AppendMany(window.Message.Log.Content.Skip(i * height).Take(height));
+                page.AppendMany(Window.Message.Log.Content.Skip(i * height).Take(height));
                 logList.Add(page);
             }
             var index = 0;
@@ -1067,8 +1053,8 @@ class Program
                     break;
                 else if (order == "c")
                 {
-                    window.Message.Clear();
-                    window.Message.Log.Clear();
+                    Window.Message.Clear();
+                    Window.Message.Log.Clear();
                     Console.Clear();
                     Console.WriteLine("ログを消去しました。任意のキーを押してください. . .");
                     Console.ReadLine();
@@ -1092,7 +1078,7 @@ class Program
             {
                 Console.Clear();
                 ("ログ", White).WriteLine();
-                window.Message.Log.WriteLine();
+                Window.Message.Log.WriteLine();
                 ("\nログを消去するには c キーを押してください", White).WriteLine();
                 ("\n終了するには、r キーを押してください", White).WriteLine();
                 var order = Console.ReadLine() ?? string.Empty;
@@ -1100,8 +1086,8 @@ class Program
                     break;
                 else if (order == "c")
                 {
-                    window.Message.Clear();
-                    window.Message.Log.Clear();
+                    Window.Message.Clear();
+                    Window.Message.Log.Clear();
                     Console.Clear();
                     Console.WriteLine("ログを消去しました。任意のキーを押してください. . .");
                     Console.ReadLine();
@@ -1127,58 +1113,58 @@ class Program
     /// <summary>
     /// 拡張無属性辞書に単語を追加します。
     /// </summary>
-    static void __OnAddOrdered(string[] order, CancellationTokenSource cts)
+    static void OnAddOrdered(Order order, CancellationTokenSource cts)
     {
-        if (order.Length != 2)
+        if (order.ErrorMessage is not null)
         {
-            Warn();
+            Warn(order.ErrorMessage);
             return;
         }
-        if (SBDictionary.NoTypeWords.Contains(order[1]) || SBDictionary.NoTypeWordEx.Contains(order[1]) || SBDictionary.TypedWords.ContainsKey(order[1]))
+        if (SBDictionary.NoTypeWords.Contains(order.Body) || SBDictionary.NoTypeWordEx.Contains(order.Body) || SBDictionary.TypedWords.ContainsKey(order.Body))
         {
-            Warn($"単語「{order[1]}」は既に辞書に含まれています。");
+            Warn($"単語「{order.Body}」は既に辞書に含まれています。");
             return;
         }
         var kanaCheck = new Regex(@"^[\u3040-\u309Fー]+$");
-        if (!kanaCheck.IsMatch(order[1]))
+        if (!kanaCheck.IsMatch(order.Body))
         {
             Warn("ひらがな以外を含む入力は無効です。");
             return;
         }
         using var file = new StreamWriter(NoTypeWordExPath, true, Encoding.UTF8);
-        SBDictionary.NoTypeWordEx.Add(order[1]);
-        file.WriteLine(order[1]);
-        window.Message.Append($"単語「{order[1]}」を辞書に追加しました。", Yellow);
+        SBDictionary.NoTypeWordEx.Add(order.Body);
+        file.WriteLine(order.Body);
+        Window.Message.Append($"単語「{order.Body}」を辞書に追加しました。", Yellow);
     }
     /// <summary>
     /// 拡張無属性辞書から単語を削除します。
     /// </summary>
     /// <param name="order"></param>
     /// <param name="cts"></param>
-    static void __OnRemoveOrdered(string[] order, CancellationTokenSource cts)
+    static void OnRemoveOrdered(Order order, CancellationTokenSource cts)
     {
-        if (order.Length != 2)
+        if (order.ErrorMessage is not null)
         {
-            Warn();
+            Warn(order.ErrorMessage);
             return;
         }
-        if (!SBDictionary.NoTypeWordEx.Contains(order[1]))
+        if (!SBDictionary.NoTypeWordEx.Contains(order.Body))
         {
-            Warn($"単語「{order[1]}」は拡張辞書に含まれていません。");
+            Warn($"単語「{order.Body}」は拡張辞書に含まれていません。");
             return;
         }
         using var file = new StreamWriter(NoTypeWordExPath, false, Encoding.UTF8);
-        SBDictionary.NoTypeWordEx.Remove(order[1]);
+        SBDictionary.NoTypeWordEx.Remove(order.Body);
         foreach (var i in SBDictionary.NoTypeWordEx)
             file.WriteLine(i);
-        window.Message.Append($"単語「{order[1]}」を辞書から削除しました。", Yellow);
+        Window.Message.Append($"単語「{order.Body}」を辞書から削除しました。", Yellow);
     }
     /// <summary>
     /// ワードサーチモードを起動します。
     /// </summary>
     /// <param name="order"></param>
     /// <param name="cts"></param>
-    static void __OnSearchOrdered(string[] order, CancellationTokenSource cts)
+    static void OnSearchOrdered(Order order, CancellationTokenSource cts)
     {
         var searchMsg = new MessageBox();
         while (true)
@@ -1206,19 +1192,19 @@ class Program
             }
             if (orderSearchLog[0] == "-m")
             {
-                __ShowWordSearchManual();
+                ShowWordSearchManual();
                 continue;
             }
             var cond = orderSearchLog[0];
             int searchOption = 0;
             int dicOption = 0;
-            if (orderSearchLog.Length > 1 && !__TryStringToSearchOption(orderSearchLog[1], out searchOption))
+            if (orderSearchLog.Length > 1 && !TryStringToSearchOption(orderSearchLog[1], out searchOption))
             {
                 searchMsg.Append($"サーチオプション{orderSearchLog[1]}が見つかりませんでした。", Red);
                 Console.Clear();
                 continue;
             }
-            if (orderSearchLog.Length > 2 && !__TryStringToDicOption(orderSearchLog[2], out dicOption))
+            if (orderSearchLog.Length > 2 && !TryStringToDicOption(orderSearchLog[2], out dicOption))
             {
                 searchMsg.Append($"辞書オプション{orderSearchLog[2]}が見つかりませんでした。", Red);
                 Console.Clear();
@@ -1229,7 +1215,7 @@ class Program
             ("\n検索条件: ", Yellow).Write();
             (string.Join(" ", orderSearchLog), Cyan).WriteLine();
             ("\nマッチする単語を探しています. . . \n", Yellow).WriteLine();
-            if (!__TrySearch(cond, searchOption, dicOption, out var words))
+            if (!TrySearch(cond, searchOption, dicOption, out var words))
             {
                 ("マッチする単語が見つかりませんでした。\n\n", Red).WriteLine();
                 Console.WriteLine("やり直すには任意のキーを押してください。");
@@ -1315,7 +1301,7 @@ class Program
     /// <summary>
     /// ワードサーチモードの操作方法を表示します。
     /// </summary>
-    static void __ShowWordSearchManual()
+    static void ShowWordSearchManual()
     {
         Console.Clear();
         ("ワードサーチモード\n", White).WriteLine();
@@ -1324,7 +1310,7 @@ class Program
         ("[検索する単語の条件] [検索オプション] [辞書オプション]\n", Green).WriteLine();
         ("辞書オプションを指定する場合、検索オプションを省略することはできません。\n", Yellow).WriteLine();
         ("・検索オプション\n", Yellow).WriteLine();
-        ("現在、以下の６種類が使用可能です。いずれも、アルファベット一文字を指定します。\n"
+        ("現在、以下の８種類が使用可能です。いずれも、アルファベット一文字を指定します。\n"
             + "省略した場合は、m オプションとして処理されます。\n", Yellow).WriteLine();
         ("・m オプション  →  指定した文字列と完全一致する単語を検索します。\n"
        + "・c オプション  →  指定した文字列を含んでいる単語を検索します。\n"
@@ -1358,7 +1344,7 @@ class Program
     /// <param name="dicOption">辞書のオプション</param>
     /// <param name="words">検索条件にマッチする文字列のリスト</param>
     /// <returns>検索が成功したかどうかを表すフラグ</returns>
-    static bool __TrySearch(string name, int searchOption, int dicOption, out List<string> words)
+    static bool TrySearch(string name, int searchOption, int dicOption, out List<string> words)
     {
         bool result = false;
         words = new();
@@ -1396,26 +1382,12 @@ class Program
         return result;
     }
     /// <summary>
-    /// 例外を発生させ、アプリケーションを終了させます。
-    /// </summary>
-    static void __OnErrorOrdered(string[] order, CancellationTokenSource cts)
-    {
-        __Error();
-    }
-    /// <summary>
-    /// 例外発生操作を実行します。
-    /// </summary>
-    static void __Error()
-    {
-        Console.WriteLine((new int[6])[9]);
-    }
-    /// <summary>
     /// 文字列を検索オプションに変換します。
     /// </summary>
     /// <param name="str">変換する<see cref="string"/></param>
     /// <param name="option">変換された検索オプションを表す<see cref="int"/></param>
     /// <returns>変換が成功したかどうかを表すフラグ</returns>
-    static bool __TryStringToSearchOption(string str, out int option)
+    static bool TryStringToSearchOption(string str, out int option)
     {
         (var result, option) = str switch
         {
@@ -1438,7 +1410,7 @@ class Program
     /// <param name="str">変換する<see cref="string"/></param>
     /// <param name="option">変換された辞書オプションを表す<see cref="int"/></param>
     /// <returns>変換が成功したかどうかを表すフラグ</returns>
-    static bool __TryStringToDicOption(string str, out int option)
+    static bool TryStringToDicOption(string str, out int option)
     {
         (var result, option) = str switch
         {

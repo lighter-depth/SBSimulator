@@ -1,15 +1,16 @@
-﻿using System.Diagnostics.CodeAnalysis;
+﻿using System.Collections.Generic;
+using System.Diagnostics.CodeAnalysis;
 using System.Text.RegularExpressions;
 using Umayadia.Kana;
-using static SBSimulator.Source.Word;
+using static SBSimulator.Word;
 
-namespace SBSimulator.Source;
+namespace SBSimulator;
 // Program クラスで行っている処理を抽出したクラス。
 // 文字列で入力し、アノテーション付き文字列で出力する。
 /// <summary>
 /// バトル単位の処理を管理するクラスです。
 /// </summary>
-internal class Battle
+public class Battle
 {
     /// <summary>
     /// 一人目のプレイヤー情報
@@ -42,7 +43,7 @@ internal class Battle
     /// <summary>
     /// 入力処理を行うハンドラー
     /// </summary>
-    [property: NotNull] public Func<string[]>? In { get; set; }
+    [property: NotNull] public Func<Order>? In { get; set; }
     /// <summary>
     /// 出力処理を行うハンドラー
     /// </summary>
@@ -52,14 +53,21 @@ internal class Battle
     /// </summary>
     /// <returns>アノテーション付き文字列のリスト</returns>
     public List<AnnotatedString> Buffer { get; private set; } = new();
+    [property: NotNull] public Action<Order, CancellationTokenSource>? OnShowOrdered { get; set; }
+    [property: NotNull] public Action<Order, CancellationTokenSource>? OnResetOrdered { get; set; }
+    [property: NotNull] public Action<Order, CancellationTokenSource>? OnExitOrdered { get; set; }
+    [property: NotNull] public Action<Order, CancellationTokenSource>? OnHelpOrdered { get; set; }
+    [property: NotNull] public Action<Order, CancellationTokenSource>? OnAddOrdered { get; set; }
+    [property: NotNull] public Action<Order, CancellationTokenSource>? OnRemoveOrdered { get; set; }
+    [property: NotNull] public Action<Order, CancellationTokenSource>? OnSearchOrdered { get; set; }
     /// <summary>
     /// リセット時の処理を行うハンドラー
     /// </summary>
-    public event Action<CancellationTokenSource>? OnReset;
+    [property: NotNull] public Action<CancellationTokenSource>? OnReset { get; set; }
     /// <summary>
     /// コマンド列とハンドラーを紐づける辞書
     /// </summary>
-    Dictionary<string, Action<string[], CancellationTokenSource>> OrderFunctions = new();
+    Dictionary<OrderType, Action<Order, CancellationTokenSource>> OrderFunctions = new();
     /// <summary>
     /// アクションを行う側のプレイヤー
     /// </summary>
@@ -104,9 +112,9 @@ internal class Battle
     /// インスタンスを実行します。
     /// </summary>
     /// <param name="custom"> <see cref="Initialize"/>に渡すハンドラーの情報 </param>
-    public void Run(Dictionary<string, Action<string[], CancellationTokenSource>> custom)
+    public void Run()
     {
-        Initialize(custom);
+        Initialize();
         Out(Buffer);
         var cts = new CancellationTokenSource();
         while (!cts.IsCancellationRequested)
@@ -115,14 +123,14 @@ internal class Battle
 
             // 入力処理、CPU かどうかを判定
             var order = CurrentPlayer is not CPUPlayer cpu ? In() : cpu.Execute();
-            if (order?.Length is 0 || string.IsNullOrWhiteSpace(order?[0])) 
+            if (order.Type is OrderType.None)
             {
                 Out(Buffer);
                 continue;
             }
 
             // 辞書 OrderFunctions からコマンド名に合致するハンドラーを取り出す
-            if (OrderFunctions.TryGetValue(order[0], out var func))
+            if (OrderFunctions.TryGetValue(order.Type, out var func))
                 func(order, cts);
             else
                 OnDefault(order, cts);
@@ -137,21 +145,30 @@ internal class Battle
     /// インスタンスの初期設定を実行します。
     /// </summary>
     /// <param name="custom"> カスタムで追加するハンドラーの情報 </param>
-    private void Initialize(Dictionary<string, Action<string[], CancellationTokenSource>> custom)
+    private void Initialize()
     {
         IsPlayer1sTurn = InitIsP1sTurn();
-        if(CurrentPlayer.Ability.InitMessage is not null) Buffer.Add(CurrentPlayer.Ability.InitMessage);
+        if (CurrentPlayer.Ability.InitMessage is not null) Buffer.Add(CurrentPlayer.Ability.InitMessage);
         if (OtherPlayer.Ability.InitMessage is not null) Buffer.Add(OtherPlayer.Ability.InitMessage);
         Buffer.Add($"{CurrentPlayer.Name} のターンです", Notice.General);
         Buffer.Add($"{Player1.Name}: {Player1.HP}/{Player1.MaxHP},     {Player2.Name}: {Player2.HP}/{Player2.MaxHP}", Notice.LogInfo);
         OrderFunctions = new()
         {
-            ["change"] = OnChangeOrdered,
-            ["ch"] = OnChangeOrdered,
-            ["option"] = OnOptionOrdered,
-            ["op"] = OnOptionOrdered,
+            [OrderType.Error] = OnErrorOrdered,
+            [OrderType.Change] = OnChangeOrdered,
+            [OrderType.EnablerOption] = OnEnablerOptionOrdered,
+            [OrderType.NumOption] = OnNumOptionOrdered,
+            [OrderType.PlayerNumOption] = OnPlayerNumOptionOrdered,
+            [OrderType.PlayerStringOption] = OnPlayerStringOptionOrdered,
+            [OrderType.ModeOption] = OnModeOptionOrdered,
+            [OrderType.Show] = OnShowOrdered,
+            [OrderType.Reset] = OnResetOrdered,
+            [OrderType.Exit] = OnExitOrdered,
+            [OrderType.Help] = OnHelpOrdered,
+            [OrderType.Add] = OnAddOrdered,
+            [OrderType.Remove] = OnRemoveOrdered,
+            [OrderType.Search] = OnSearchOrdered
         };
-        OrderFunctions = OrderFunctions.Concat(custom.Where(pair => !OrderFunctions.ContainsKey(pair.Key))).ToDictionary(pair => pair.Key, pair => pair.Value);
     }
     /// <summary>
     /// 先攻・後攻の設定を行います。
@@ -171,7 +188,7 @@ internal class Battle
     /// <summary>
     /// デフォルトで実行されるハンドラーです。単語の種別に応じて<see cref="Contract"/>を生成し処理します。
     /// </summary>
-    public void OnDefault(string[] order, CancellationTokenSource cts)
+    public void OnDefault(Order order, CancellationTokenSource cts)
     {
         Word? word;
 
@@ -181,9 +198,9 @@ internal class Battle
         bool isInferSuccessed;
 
         // タイプ推論が有効な場合。推論できない場合は無属性。
-        if (IsInferable && order.Length == 1)
+        if (IsInferable && order.TypeParam is null)
         {
-            var name = KanaConverter.ToHiragana(order[0]).Replace('ヴ', 'ゔ');
+            var name = KanaConverter.ToHiragana(order.Body).Replace('ヴ', 'ゔ');
             isInferSuccessed = TryInferWordTypes(name, out Word wordtemp);
             word = wordtemp;
         }
@@ -191,9 +208,9 @@ internal class Battle
         // 単語の書式が不正な場合には、isInferSuccessed を false に設定する。
         else
         {
-            var type1 = order.Length > 1 ? order[1][0].CharToType() : WordType.Empty;
-            var type2 = order.Length > 1 ? order[1].Length == 2 ? order[1][1].CharToType() : WordType.Empty : WordType.Empty;
-            word = new Word(order[0], CurrentPlayer, OtherPlayer, type1, type2);
+            var type1 = order.TypeParam?.Length > 0 ? order.TypeParam?[0].CharToType() : WordType.Empty;
+            var type2 = order.TypeParam?.Length > 0 ? order.TypeParam?.Length > 1 ? order.TypeParam?[1].CharToType() : WordType.Empty : WordType.Empty;
+            word = new Word(order.Body, CurrentPlayer, OtherPlayer, type1 ?? WordType.Empty, type2 ?? WordType.Empty);
             isInferSuccessed = word.Name.IsWild() || new Regex("^[ぁ-ゔゟァ-ヴー]*$").IsMatch(word.Name);
         }
 
@@ -218,18 +235,22 @@ internal class Battle
         Buffer.AddMany(c.Message);
 
         // プレイヤーが死んだかどうかの判定、ターンの交代。
-        if (c.DeadFlag) 
+        if (c.DeadFlag)
         {
-            Out?.Invoke(Buffer);
-            OnReset?.Invoke(cts); 
+            Out(Buffer);
+            OnReset(cts);
         }
         if (c.IsBodyExecuted) ToggleTurn();
+    }
+    public void OnErrorOrdered(Order order, CancellationTokenSource cts)
+    {
+        Buffer.Add(order?.ErrorMessage ?? "入力が不正です", Notice.Warn);
     }
 
     /// <summary>
     /// とくせいを変更する際に実行されるハンドラーです。
     /// </summary>
-    public void OnChangeOrdered(string[] order, CancellationTokenSource cts)
+    public void OnChangeOrdered(Order order, CancellationTokenSource cts)
     {
         // 「変更可能な特性」設定の確認
         if (!IsAbilChangeable)
@@ -237,413 +258,202 @@ internal class Battle
             Buffer.Add("設定「変更可能な特性」がオフになっています。option コマンドから設定を切り替えてください。", Notice.Warn);
             return;
         }
-
-        // パラメータにプレイヤーを指定していない場合の処理
-        if (order.Length == 2)
+        var abilChangingPlayer = order.Selector is PlayerSelector.Player1 ? Player1 : Player2;
+        var nextAbil = AbilityFactory.Create(order.Body, IsCustomAbilUsable);
+        if (nextAbil is null)
         {
-            var nextAbil = AbilityFactory.Create(order[1], IsCustomAbilUsable);
-            if (nextAbil is null)
-            {
-                Buffer.Add($"入力 {order[1]} に対応するとくせいが見つかりませんでした。", Notice.Warn);
-                return;
-            }
-            if (nextAbil == CurrentPlayer.Ability)
-            {
-                Buffer.Add("既にそのとくせいになっている！", Notice.Warn);
-                return;
-            }
-            if (CurrentPlayer.TryChangeAbil(nextAbil))
-            {
-                Buffer.Add($"{CurrentPlayer.Name} はとくせいを {nextAbil.ToString()} に変更しました", Notice.SystemInfo);
-                if (nextAbil.InitMessage is not null) Buffer.Add(nextAbil.InitMessage);
-            }
-            else
-                Buffer.Add($"{CurrentPlayer.Name} はもう特性を変えられない！", Notice.Caution);
+            Buffer.Add($"入力 {order.Body} に対応するとくせいが見つかりませんでした。", Notice.Warn);
+            return;
         }
-
-        // パラメータにプレイヤーを指定している場合の処理
-        else if (order.Length == 3)
+        if (nextAbil == abilChangingPlayer.Ability)
         {
-            Player abilChangingP = new();
-            bool player1Flag = order[1] == Player1.Name || order[1] == "Player1" || order[1] == "p1";
-            bool player2Flag = order[1] == Player2.Name || order[1] == "Player2" || order[1] == "p2";
-            if (!player1Flag && !player2Flag)
-            {
-                Buffer.Add($"名前 {order[1]} を持つプレイヤーが見つかりませんでした。", Notice.Warn);
-                return;
-            }
-            if (player1Flag)
-                abilChangingP = Player1;
-            else if (player2Flag)
-                abilChangingP = Player2;
-            var nextAbil = AbilityFactory.Create(order[2], IsCustomAbilUsable);
-            if (nextAbil is null)
-            {
-                Buffer.Add($"入力 {order[2]} に対応するとくせいが見つかりませんでした。", Notice.Warn);
-                return;
-            }
-            if (nextAbil == abilChangingP.Ability)
-            {
-                Buffer.Add("既にそのとくせいになっている！", Notice.Warn);
-                return;
-            }
-            if (abilChangingP.TryChangeAbil(nextAbil))
-            {
-                Buffer.Add($"{abilChangingP.Name} はとくせいを {nextAbil.ToString()} に変更しました", Notice.SystemInfo);
-                if (nextAbil.InitMessage is not null) Buffer.Add(nextAbil.InitMessage);
-            }
-            else
-                Buffer.Add($"{abilChangingP.Name} はもう特性を変えられない！", Notice.Caution);
+            Buffer.Add("既にそのとくせいになっている！", Notice.Warn);
+            return;
+        }
+        if (abilChangingPlayer.TryChangeAbil(nextAbil))
+        {
+            Buffer.Add($"{abilChangingPlayer.Name} はとくせいを {nextAbil.ToString()} に変更しました", Notice.SystemInfo);
+            if (nextAbil.InitMessage is not null) Buffer.Add(nextAbil.InitMessage);
         }
         else
-            Buffer.Add("入力が不正です。", Notice.Warn);
-    }
-
-    /// <summary>
-    /// オプションを設定する際に実行されるハンドラーです。
-    /// </summary>
-    public void OnOptionOrdered(string[] order, CancellationTokenSource cts)
-    {
-        if (order.Length < 2)
-        {
-            Buffer.Add("入力が不正です", Notice.Warn);
-            return;
-        }
-
-        // 変更するオプションの決定
-        Action<string[]> option = order[1].ToLower() switch
-        {
-            "setmaxhp" or "smh" => OptionSetMaxHP,
-            "infiniteseed" or "is" => OptionInfiniteSeed,
-            "infinitecure" or "ic" => OptionInfiniteCure,
-            "abilchange" or "ac" => OptionAbilChange,
-            "strict" or "s" => OptionStrict,
-            "infer" or "i" => OptionInfer,
-            "customabil" or "ca" or "cs" => OptionCustomAbil,
-            "cpudelay" or "delay" or "cd" => OptionCPUDelay,
-            "setabilcount" or "sac" => OptionSetAbilCount,
-            "setmaxcurecount" or "smcc" or "smc" => OptionSetMaxCureCount,
-            "setmaxfoodcount" or "smfc" or "smf" => OptionSetMaxFoodCount,
-            "setseeddmg" or "ssd" => OptionSetSeedDmg,
-            "setmaxseedturn" or "smst" or "sms" => OptionSetMaxSeedTurn,
-            "setcritdmgmultiplier" or "scdm" or "scd" => OptionSetCritDmgMultiplier,
-            "setinsbufqty" or "sibq" or "sib" => OptionSetInsBufQty,
-            "setmode" or "sm" => OptionSetMode,
-            _ => OptionDefault
-        };
-
-        // オプションの実行
-        option(order);
-    }
-
-    // オプションを処理するメソッド群
-    #region options
-    private void OptionSetMaxHP(string[] order)
-    {
-        if (order.Length != 4)
-        {
-            Buffer.Add("入力が不正です。", Notice.Warn);
-            return;
-        }
-        if (!int.TryParse(order[3], out var hp))
-        {
-            Buffer.Add("HPの書式が不正です。", Notice.Warn);
-            return;
-        }
-        if (!TryStringToPlayer(order[2], out var p))
-        {
-            Buffer.Add($"プレイヤー {order[2]} が見つかりませんでした。", Notice.Warn);
-            return;
-        }
-        p.MaxHP = hp;
-        p.HP = p.MaxHP;
-        Buffer.Add($"{p.Name} の最大HPを {p.MaxHP} に設定しました。", Notice.SettingInfo);
-    }
-    private void OptionInfiniteSeed(string[] order)
-    {
-        if (order.Length != 3)
-        {
-            Buffer.Add("入力が不正です。", Notice.Warn);
-            return;
-        }
-        if (!order[2].TryStringToEnabler(out bool enabler))
-        {
-            Buffer.Add("入力が不正です。", Notice.Warn);
-            return;
-        }
-        if (enabler)
-        {
-            IsSeedInfinite = true;
-            Buffer.Add("やどりぎの継続ターン数を 無限 に変更しました。", Notice.SettingInfo);
-            return;
-        }
-        IsSeedInfinite = false;
-        Buffer.Add($"やどりぎの継続ターン数を {Player.MaxSeedTurn} ターン に変更しました。", Notice.SettingInfo);
-    }
-    private void OptionInfiniteCure(string[] order)
-    {
-        if (order.Length != 3)
-        {
-            Buffer.Add("入力が不正です。", Notice.Warn);
-            return;
-        }
-        if (!order[2].TryStringToEnabler(out bool enabler))
-        {
-            Buffer.Add("入力が不正です。", Notice.Warn);
-            return;
-        }
-        if (enabler)
-        {
-            IsCureInfinite = true;
-            Buffer.Add("医療タイプの単語で回復可能な回数を 無限 に変更しました。", Notice.SettingInfo);
-            return;
-        }
-        IsCureInfinite = false;
-        Buffer.Add($"医療タイプの単語で回復可能な回数を {Player.MaxCureCount}回 に変更しました。", Notice.SettingInfo);
-    }
-    private void OptionAbilChange(string[] order)
-    {
-        if (order.Length != 3)
-        {
-            Buffer.Add("入力が不正です。", Notice.Warn);
-            return;
-        }
-        if (!order[2].TryStringToEnabler(out bool enabler))
-        {
-            Buffer.Add("入力が不正です。", Notice.Warn);
-            return;
-        }
-        if (enabler)
-        {
-            IsAbilChangeable = true;
-            Buffer.Add($"とくせいの変更を有効にしました。(上限 {Player.MaxAbilChange}回 まで)", Notice.SettingInfo);
-            return;
-        }
-        IsAbilChangeable = false;
-        Buffer.Add($"とくせいの変更を無効にしました。", Notice.SettingInfo);
+            Buffer.Add($"{abilChangingPlayer.Name} はもう特性を変えられない！", Notice.Caution);
 
     }
-    private void OptionStrict(string[] order)
+    public void OnEnablerOptionOrdered(Order order, CancellationTokenSource cts)
     {
-        if (order.Length != 3)
+        var enabler = order.Enabler;
+        if (order.Option == Options.InfiniteSeed)
         {
-            Buffer.Add("入力が不正です。", Notice.Warn);
+            IsSeedInfinite = enabler;
+            Buffer.Add($"やどりぎの継続ターン数を {(enabler ? "無限" : $"{Player.MaxSeedTurn}ターン")} に変更しました。", Notice.SettingInfo);
             return;
         }
-        if (!order[2].TryStringToEnabler(out bool enabler))
+        if (order.Option == Options.InfiniteCure)
         {
-            Buffer.Add("入力が不正です。", Notice.Warn);
+            IsCureInfinite = enabler;
+            Buffer.Add($"医療タイプの単語で回復可能な回数を {(enabler ? "無限" : $"{Player.MaxCureCount}回")} に変更しました。", Notice.SettingInfo);
             return;
         }
-        if (enabler)
+        if (order.Option == Options.AbilChange)
         {
-            IsStrict = true;
-            Buffer.Add($"ストリクト モードを有効にしました。", Notice.SettingInfo);
+            IsAbilChangeable = enabler;
+            Buffer.Add($"とくせいの変更を{(enabler ? $"有効にしました。(上限 {Player.MaxAbilChange}回 まで" : "無効にしました")})", Notice.SettingInfo);
             return;
         }
-        IsStrict = false;
-        Buffer.Add($"ストリクト モードを無効にしました。", Notice.SettingInfo);
-    }
-    private void OptionInfer(string[] order)
-    {
-        if (order.Length != 3)
+        if (order.Option == Options.Strict)
         {
-            Buffer.Add("入力が不正です。", Notice.Warn);
+            IsStrict = enabler;
+            Buffer.Add($"ストリクト モードを{(enabler ? "有効" : "無効")}にしました。", Notice.SettingInfo);
             return;
         }
-        if (!order[2].TryStringToEnabler(out bool enabler))
-        {
-            Buffer.Add("入力が不正です。", Notice.Warn);
-            return;
-        }
-        if (enabler)
+        if (order.Option == Options.Infer)
         {
             IsInferable = true;
-            Buffer.Add($"タイプの推論を有効にしました。", Notice.SettingInfo);
+            Buffer.Add($"タイプの推論を{(enabler ? "有効" : "無効")}にしました。", Notice.SettingInfo);
             return;
         }
-        IsInferable = false;
-        Buffer.Add($"タイプの推論を無効にしました。", Notice.SettingInfo);
+        if (order.Option == Options.CustomAbil)
+        {
+            IsCustomAbilUsable = enabler;
+            Buffer.Add($"カスタム特性を{(enabler ? "有効" : "無効")}にしました。", Notice.SettingInfo);
+            if (enabler) return;
+            if (Player1.Ability is CustomAbility)
+            {
+                Buffer.Add($"特性が見つかりません。{Player1.Name} の特性をデバッガーに設定します。", Notice.Caution);
+                Player1.Ability = new Debugger();
+            }
+            if (Player2.Ability is CustomAbility)
+            {
+                Buffer.Add($"特性が見つかりません。{Player2.Name} の特性をデバッガーに設定します。", Notice.Caution);
+                Player2.Ability = new Debugger();
+            }
+            return;
+        }
+        if (order.Option == Options.CPUDelay)
+        {
+            IsCPUDelayEnabled = enabler;
+            Buffer.Add($"CPUの待ち時間を{(enabler ? "有効" : "無効")}にしました。", Notice.SettingInfo);
+            return;
+        }
     }
-    private void OptionCustomAbil(string[] order)
+    public void OnNumOptionOrdered(Order order, CancellationTokenSource cts)
     {
-        if (order.Length != 3)
+        var intParam = (int)order.Param[0];
+        if (order.Option == Options.SetAbilCount)
         {
-            Buffer.Add("入力が不正です。", Notice.Warn);
+            Player.MaxAbilChange = intParam;
+            Buffer.Add($"とくせいの変更回数上限を {Player.MaxAbilChange}回 に設定しました。", Notice.SettingInfo);
             return;
         }
-        if (!order[2].TryStringToEnabler(out bool enabler))
+        if (order.Option == Options.SetMaxCureCount)
         {
-            Buffer.Add("入力が不正です。", Notice.Warn);
+            Player.MaxCureCount = intParam;
+            Buffer.Add($"医療タイプの単語による回復の回数上限を {Player.MaxCureCount}回 に設定しました。", Notice.SettingInfo);
             return;
         }
-        if (enabler)
+        if (order.Option == Options.SetMaxFoodCount)
         {
-            IsCustomAbilUsable = true;
-            Buffer.Add($"カスタム特性を有効にしました。", Notice.SettingInfo);
+            Player.MaxFoodCount = intParam;
+            Buffer.Add($"食べ物タイプの単語による回復の回数上限を {Player.MaxFoodCount}回 に設定しました。", Notice.SettingInfo);
             return;
         }
-        IsCustomAbilUsable = false;
-        Buffer.Add($"カスタム特性を無効にしました。", Notice.SettingInfo);
-        if(Player1.Ability is CustomAbility)
+        if (order.Option == Options.SetSeedDmg)
         {
-            Buffer.Add($"特性が見つかりません。{Player1.Name} の特性をデバッガーに設定します。", Notice.Caution);
-            Player1.Ability = new Debugger();
+            Player.SeedDmg = intParam;
+            Buffer.Add($"やどりぎによるダメージを {Player.SeedDmg} に設定しました。", Notice.SettingInfo);
+            return;
         }
-        if (Player2.Ability is CustomAbility)
+        if (order.Option == Options.SetMaxSeedTurn)
         {
-            Buffer.Add($"特性が見つかりません。{Player2.Name} の特性をデバッガーに設定します。", Notice.Caution);
-            Player2.Ability = new Debugger();
+            Player.MaxSeedTurn = intParam;
+            Buffer.Add($"やどりぎの継続ターン数を {Player.MaxSeedTurn}ターン に設定しました。", Notice.SettingInfo);
+            return;
+        }
+        if (order.Option == Options.SetCritDmgMultiplier)
+        {
+            Player.CritDmg = order.Param[0];
+            Buffer.Add($"急所によるダメージ倍率を {Player.CritDmg}倍 に設定しました。", Notice.SettingInfo);
+            return;
+        }
+        if (order.Option == Options.SetInsBufQty)
+        {
+            Player.InsBufQty = intParam;
+            Buffer.Add($"ほけん発動による攻撃力の変化を {Player.InsBufQty} 段階 に設定しました。", Notice.SettingInfo);
+            return;
         }
     }
-    private void OptionCPUDelay(string[] order)
+    private void OnPlayerNumOptionOrdered(Order order, CancellationTokenSource cts)
     {
-        if (order.Length != 3)
+        var player = order.Selector switch
         {
-            Buffer.Add("入力が不正です。", Notice.Warn);
+            PlayerSelector.Player1 => Player1,
+            PlayerSelector.Player2 => Player2,
+            _ => null
+        };
+        if (player is null)
+        {
+            Buffer.Add("条件に一致するプレイヤーが見つかりませんでした。", Notice.Warn);
             return;
         }
-        if (!order[2].TryStringToEnabler(out bool enabler))
+        if (order.Option == Options.SetMaxHP)
         {
-            Buffer.Add("入力が不正です。", Notice.Warn);
+            player.MaxHP = (int)order.Param[0];
+            player.HP = player.MaxHP;
+            Buffer.Add($"{player.Name} の最大HPを {player.MaxHP} に設定しました。", Notice.SettingInfo);
             return;
         }
-        if (enabler)
+        if(order.Option == Options.SetHP)
         {
-            IsCPUDelayEnabled = true;
-            Buffer.Add($"CPUの待ち時間を有効にしました。", Notice.SettingInfo);
+            player.HP = Math.Max(Math.Min((int)order.Param[0], player.MaxHP), 1);
+            Buffer.Add($"{player.Name} のHPを {player.HP} に設定しました。", Notice.SettingInfo);
             return;
         }
-        IsCPUDelayEnabled = false;
-        Buffer.Add($"CPUの待ち時間を無効にしました。", Notice.SettingInfo);
     }
-    private void OptionSetAbilCount(string[] order)
+    private void OnPlayerStringOptionOrdered(Order order, CancellationTokenSource cts) 
     {
-        if (order.Length != 3)
+        var player = order.Selector switch
         {
-            Buffer.Add("入力が不正です。", Notice.Warn);
+            PlayerSelector.Player1 => Player1,
+            PlayerSelector.Player2 => Player2,
+            _ => null
+        };
+        if(player is null)
+        {
+            Buffer.Add("条件に一致するプレイヤーが見つかりませんでした。", Notice.Warn); 
             return;
         }
-        if (!int.TryParse(order[2], out int abilCount) || abilCount < 0)
+        if(order.Option == Options.SetLuck)
         {
-            Buffer.Add("とくせいの変更回数の入力が不正です。", Notice.Warn);
-            return;
+            var luck = order.Body.ToLower() switch
+            {
+                "max" or "l" or "lucky" => Luck.Lucky,
+                "min" or "u" or "unlucky" => Luck.UnLucky,
+                _ => Luck.Normal
+            };
+            player.Luck = luck;
+            Buffer.Add($"{player.Name} の運を {luck switch 
+            {
+                Luck.Lucky => "最大",
+                Luck.UnLucky => "最小",
+                _ => "通常"
+            }} に設定しました。", Notice.SettingInfo);
         }
-        Player.MaxAbilChange = abilCount;
-        Buffer.Add($"とくせいの変更回数上限を {Player.MaxAbilChange}回 に設定しました。", Notice.SettingInfo);
     }
-    private void OptionSetMaxCureCount(string[] order)
+    private void OnModeOptionOrdered(Order order, CancellationTokenSource cts)
     {
-        if (order.Length != 3)
+        if (order.Option == Options.SetMode)
         {
-            Buffer.Add("入力が不正です。", Notice.Warn);
+            var (mode, modeName) = ModeFactory.Create(order.Body);
+            if (mode is null)
+            {
+                Buffer.Add($"モード {order.Body} が見つかりません。", Notice.Warn);
+                return;
+            }
+            mode.Set(this);
+            Buffer.Add($"モードを {modeName} に設定しました。", Notice.SettingInfo);
             return;
         }
-        if (!int.TryParse(order[2], out int cureCount) || cureCount <= 0)
-        {
-            Buffer.Add("回復回数の入力が不正です。", Notice.Warn);
-            return;
-        }
-        Player.MaxCureCount = cureCount;
-        Buffer.Add($"医療タイプの単語による回復の回数上限を {Player.MaxCureCount}回 に設定しました。", Notice.SettingInfo);
     }
-    private void OptionSetMaxFoodCount(string[] order)
-    {
-        if (order.Length != 3)
-        {
-            Buffer.Add("入力が不正です。", Notice.Warn);
-            return;
-        }
-        if (!int.TryParse(order[2], out int foodCount) || foodCount <= 0)
-        {
-            Buffer.Add("回復回数の入力が不正です。", Notice.Warn);
-            return;
-        }
-
-        Player.MaxFoodCount = foodCount;
-        Buffer.Add($"食べ物タイプの単語による回復の回数上限を {Player.MaxFoodCount}回 に設定しました。", Notice.SettingInfo);
-    }
-    private void OptionSetSeedDmg(string[] order)
-    {
-        if (order.Length != 3)
-        {
-            Buffer.Add("入力が不正です。", Notice.Warn);
-            return;
-        }
-        if (!int.TryParse(order[2], out int seedDmg) || seedDmg <= 0)
-        {
-            Buffer.Add("ダメージ値の入力が不正です。", Notice.Warn);
-            return;
-        }
-        Player.SeedDmg = seedDmg;
-        Buffer.Add($"やどりぎによるダメージを {Player.SeedDmg} に設定しました。", Notice.SettingInfo);
-    }
-    private void OptionSetMaxSeedTurn(string[] order)
-    {
-        if (order.Length != 3)
-        {
-            Buffer.Add("入力が不正です。", Notice.Warn);
-            return;
-        }
-        if (!int.TryParse(order[2], out int seedTurn) || seedTurn <= 0)
-        {
-            Buffer.Add("ターン数の入力が不正です。", Notice.Warn);
-            return;
-        }
-        Player.MaxSeedTurn = seedTurn;
-        Buffer.Add($"やどりぎの継続ターン数を {Player.MaxSeedTurn}ターン に設定しました。", Notice.SettingInfo);
-    }
-    private void OptionSetCritDmgMultiplier(string[] order)
-    {
-        if (order.Length != 3)
-        {
-            Buffer.Add("入力が不正です。", Notice.Warn);
-            return;
-        }
-        if (!double.TryParse(order[2], out double critDmg) || critDmg < 0)
-        {
-            Buffer.Add("ダメージ値の入力が不正です。", Notice.Warn);
-            return;
-        }
-        Player.CritDmg = critDmg;
-        Buffer.Add($"急所によるダメージ倍率を {Player.CritDmg}倍 に設定しました。", Notice.SettingInfo);
-    }
-    private void OptionSetInsBufQty(string[] order)
-    {
-        if (order.Length != 3)
-        {
-            Buffer.Add("入力が不正です。", Notice.Warn);
-            return;
-        }
-        if (!int.TryParse(order[2], out int insBufQty))
-        {
-            Buffer.Add("変化値の入力が不正です。", Notice.Warn);
-            return;
-        }
-        Player.InsBufQty = insBufQty;
-        Buffer.Add($"ほけん発動による攻撃力の変化を {Player.InsBufQty} 段階 に設定しました。", Notice.SettingInfo);
-    }
-    private void OptionSetMode(string[] order)
-    {
-        if (order.Length != 3)
-        {
-            Buffer.Add("入力が不正です。", Notice.Warn);
-            return;
-        }
-        var (mode, modeName) = ModeFactory.Create(order[2]);
-        if (mode is null)
-        {
-            Buffer.Add($"モード {order[2]} が見つかりません。", Notice.Warn);
-            return;
-        }
-        mode.Set(this);
-        Buffer.Add($"モードを {modeName} に設定しました。", Notice.SettingInfo);
-    }
-    private void OptionDefault(string[] order)
-    {
-        Buffer.Add($"オプション {order[1]} が存在しないか、書式が不正です。", Notice.Warn);
-    }
-    #endregion
 
     /// <summary>
     /// 文字列のタイプを推論し、単語を出力します。
@@ -688,26 +498,5 @@ internal class Battle
             Buffer.Add($"{CurrentPlayer.Name} のターンです", Notice.General);
             Buffer.Add($"{Player1.Name}: {Player1.HP}/{Player1.MaxHP},     {Player2.Name}: {Player2.HP}/{Player2.MaxHP}", Notice.LogInfo);
         }
-    }
-    /// <summary>
-    /// 文字列からプレイヤーを決定します。
-    /// </summary>
-    /// <param name="s">推論元の文字列</param>
-    /// <param name="p">指定されたプレイヤー</param>
-    /// <returns>推論が成功したかどうかを表すフラグ</returns>
-    private bool TryStringToPlayer(string s, [NotNullWhen(true)] out Player? p)
-    {
-        p = null;
-        if (s == Player1.Name || s.ToLower() is "player1" or "p1")
-        {
-            p = Player1;
-            return true;
-        }
-        if (s == Player2.Name || s.ToLower() is "player2" or "p2")
-        {
-            p = Player2;
-            return true;
-        }
-        return false;
     }
 }

@@ -1,7 +1,8 @@
-﻿using static SBSimulator.Source.Word;
+﻿using static SBSimulator.Word;
 
-namespace SBSimulator.Source;
-internal static class SBExtention
+namespace SBSimulator;
+
+public static class SBExtention
 {
     #region methods
     /// <summary>
@@ -270,6 +271,25 @@ internal static class SBExtention
     {
         var (text, color) = cString;
         new ColoredString(text, color).Write();
+    }
+    /// <summary>
+    /// 指定した<see cref="Luck"/>パラメーターをもとに、乱数を出力します。
+    /// </summary>
+    public static int Random(int maxValue, Luck luck)
+    {
+        return luck switch
+        {
+            Luck.Lucky => maxValue - 1,
+            Luck.UnLucky => 0,
+            _ => new Random().Next(maxValue)
+        };
+    }
+    /// <summary>
+    /// 指定した<see cref="Luck"/>パラメーターをもとに、<see cref="bool"/>値を出力します。
+    /// </summary>
+    public static bool RandomFlag(int maxValue, Luck luck)
+    {
+        return maxValue - 1 - Random(maxValue, luck) == 0;
     }
     #endregion
 }

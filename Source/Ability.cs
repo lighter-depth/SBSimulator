@@ -1,13 +1,13 @@
 ﻿using System.Reflection;
-using static SBSimulator.Source.Player;
-using static SBSimulator.Source.Word;
+using static SBSimulator.Player;
+using static SBSimulator.Word;
 
-namespace SBSimulator.Source;
+namespace SBSimulator;
 /// <summary>
 /// とくせいの発動条件を管理するフラグです。
 /// </summary>
 [Flags]
-internal enum AbilityType
+public enum AbilityType
 {
     /// <summary>
     /// とくせいは発動しません。
@@ -85,7 +85,7 @@ internal enum AbilityType
 /// <summary>
 /// とくせいを生成するファクトリ クラスです。
 /// </summary>
-internal class AbilityFactory
+public class AbilityFactory
 {
     // HACK: リフレクションを使わない実装に変えたい。dynamic を使えば実装できる？
     /// <summary>
@@ -112,7 +112,7 @@ internal class AbilityFactory
 /// <summary>
 /// とくせいの情報を管理するスーパークラスです。
 /// </summary>
-internal abstract class Ability
+public abstract class Ability
 {
     /// <summary>
     /// とくせいの発動する条件

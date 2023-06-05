@@ -1,11 +1,11 @@
-﻿using static SBSimulator.Source.TurnProceedingArbiter;
+﻿using static SBSimulator.TurnProceedingArbiter;
 
-namespace SBSimulator.Source;
+namespace SBSimulator;
 
 /// <summary>
 /// バトルの初期設定を行うクラスです。
 /// </summary>
-class Mode
+public class Mode
 {
     /// <summary>
     /// インスタンスがストーリーモードであるかどうかを表すフラグ

@@ -1,4 +1,6 @@
-﻿namespace SBSimulator.Source;
+﻿using static SBSimulator.SBExtention;
+
+namespace SBSimulator;
 
 // カスタム特性のテスト。
 // CustomAbility クラスを継承して実装する。 
@@ -8,7 +10,7 @@
 /// </summary>
 internal abstract class CustomAbility : Ability
 {
-    public override List<string> Name => CustomName;
+    public override sealed List<string> Name => CustomName;
     public abstract List<string> CustomName { get; }
 }
 
@@ -145,4 +147,32 @@ internal class God : CustomAbility
         }
     }
     public override string ToString() => "神";
+}
+
+/// <summary>
+/// 人体タイプの言葉を使った時、５分の１の確率で「確定」する。
+/// </summary>
+internal class Kakutei : CustomAbility
+{
+    public override AbilityType Type => AbilityType.AmpDecided | AbilityType.CritDecided | AbilityType.ActionEnd;
+    public override List<string> CustomName => new() { "dc", "DC", "かくてい", "確定", "kakutei", "Kakutei", "KAKUTEI" };
+    bool _ketsunaanaFlag = false;
+    public override void Execute(Contract c)
+    {
+        if (c is not AttackContract ac) return;
+        if(ac.State == AbilityType.AmpDecided && ac.Actor.CurrentWord.ContainsType(Word.WordType.Body) && RandomFlag(5, ac.Actor.Luck))
+        {
+            ac.AmpDmg = 1214;
+            _ketsunaanaFlag = true;
+        }
+        if(ac.State == AbilityType.CritDecided)
+        {
+            ac.CritFlag = true;
+        }
+        if(ac.State == AbilityType.ActionEnd && _ketsunaanaFlag)
+        {
+            ac.Message.Add("一撃必殺！", Notice.Warn);
+        }
+    }
+    public override string ToString() => "かくてい";
 }

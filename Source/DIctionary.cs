@@ -1,8 +1,8 @@
-﻿using static SBSimulator.Source.Word;
+﻿using static SBSimulator.Word;
 
-namespace SBSimulator.Source;
+namespace SBSimulator;
 
-internal class SBDictionary
+public class SBDictionary
 {
     /// <summary>
     /// タイプ無し単語の情報
