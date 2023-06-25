@@ -1,4 +1,5 @@
 ﻿using System.Reflection;
+using System.Runtime.CompilerServices;
 using static SBSimulator.Player;
 using static SBSimulator.Word;
 
@@ -85,7 +86,7 @@ public enum AbilityType
 /// <summary>
 /// とくせいを生成するファクトリ クラスです。
 /// </summary>
-public class AbilityFactory
+public class AbilityManager
 {
     // HACK: リフレクションを使わない実装に変えたい。dynamic を使えば実装できる？
     /// <summary>

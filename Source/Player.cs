@@ -144,7 +144,7 @@ public class Player
     /// <summary>
     /// とくせいを変更した回数
     /// </summary>
-    public int _changeableAbilCount = 0;
+    internal protected int _abilChangedCount = 0;
 
     /// <summary>
     /// バフの数値リテラルを管理する配列
@@ -189,10 +189,10 @@ public class Player
     /// <returns>変更が成功したかを表すフラグ</returns>
     public bool TryChangeAbil(Ability abil)
     {
-        if (_changeableAbilCount < MaxAbilChange)
+        if (_abilChangedCount < MaxAbilChange)
         {
             Ability = abil;
-            _changeableAbilCount++;
+            _abilChangedCount++;
             return true;
         }
         return false;
@@ -210,7 +210,7 @@ public class Player
              + $"         HP:   {HP}/{MaxHP},    残り食べ物回数:    {MaxFoodCount - FoodCount}回,          状態: [{State.StateToString()}]\n\n"
              + $"         ATK:  {ATK}倍,      残り医療回数:    {MaxCureCount - CureCount}回,        現在の単語: {currentWordString}\n\n"
              + $"         DEF:  {DEF}倍,      毒のダメージ: {PoisonDmg}ダメージ,        とくせい: {Ability.ToString()}\n\n"
-             + $"         残りとくせい変更回数: {MaxAbilChange - _changeableAbilCount}回,    残りやどりぎターン: {seedTurn}ターン\n\n";
+             + $"         残りとくせい変更回数: {MaxAbilChange - _abilChangedCount}回,    残りやどりぎターン: {seedTurn}ターン\n\n";
     }
 
     /// <summary>

@@ -67,6 +67,10 @@ internal abstract class CPUPlayer : Player
     /// CPUの初期とくせい
     /// </summary>
     public virtual Ability FirstAbility => new Debugger();
+    /// <summary>
+    /// 単語検索時に参照する、最初の文字を表します。 
+    /// </summary>
+    protected char StartChar => GetStartChar();
     static readonly int _millisecondsDelay = 1800;
     public CPUPlayer(string name, Ability ability) : base(name, ability) { }
     public CPUPlayer() : base() { }
@@ -97,7 +101,7 @@ internal abstract class CPUPlayer : Player
     /// <param name="type">タイプの指定</param>
     /// <param name="word">出力された<see cref="Word"/>クラスのインスタンス</param>
     /// <returns>単語が見つかったかどうかを表すフラグ</returns>
-    public bool TryWordSearchByType(char startChar, WordType type, [NotNullWhen(true)]out Word? word)
+    public bool TryWordSearchByType(char startChar, WordType type, [NotNullWhen(true)] out Word? word)
     {
         word = null;
         if (Parent is null) return false;
@@ -139,11 +143,30 @@ internal abstract class CPUPlayer : Player
     /// <param name="pred">条件の指定</param>
     /// <param name="word">出力された<see cref="Word"/>クラスのインスタンス</param>
     /// <returns>単語が見つかったかどうかを表すフラグ</returns>
-    public bool TryWordSearchByName(Predicate<string> pred, [NotNullWhen(true)]out Word? word)
+    public bool TryWordSearchByName(Predicate<string> pred, [NotNullWhen(true)] out Word? word)
     {
         word = null;
         if (Parent is null) return false;
         var resultWords = SBDictionary.PerfectNameDic.Where(x => pred(x) && !Parent.UsedWords.Contains(x)).ToList();
+        var random = new Random().Next(resultWords.Count);
+        if (resultWords.Count != 0 && Parent.TryInferWordTypes(resultWords[random], out var wordTemp))
+        {
+            word = wordTemp;
+            return true;
+        }
+        return false;
+    }
+    /// <summary>
+    /// 指定した条件に合うタイプ付きの単語を探します。
+    /// </summary>
+    /// <param name="pred">条件の指定</param>
+    /// <param name="word">出力された<see cref="Word"/>クラスのインスタンス</param>
+    /// <returns>単語が見つかったかどうかを表すフラグ</returns>
+    public bool TrySearchTypedWord(Predicate<string> pred, [NotNullWhen(true)] out Word? word)
+    {
+        word = null;
+        if (Parent is null) return false;
+        var resultWords = SBDictionary.TypedWords.Keys.Where(x => pred(x) && !Parent.UsedWords.Contains(x)).ToList();
         var random = new Random().Next(resultWords.Count);
         if (resultWords.Count != 0 && Parent.TryInferWordTypes(resultWords[random], out var wordTemp))
         {
@@ -159,22 +182,22 @@ internal abstract class CPUPlayer : Player
         word = null;
         var resultTypeList = new List<Word>();
         var resultList = new List<Word>();
-        if(Parent is null) return false;
-        for(var i = 0; i < NUMBER_OF_TYPES; i++)
+        if (Parent is null) return false;
+        for (var i = 0; i < NUMBER_OF_TYPES; i++)
         {
-            for(var j = 0; j < NUMBER_OF_TYPES; j++)
+            for (var j = 0; j < NUMBER_OF_TYPES; j++)
             {
                 var w = new Word(string.Empty, (WordType)i, (WordType)j);
                 if (w.CalcAmp(prev) >= 8 * Parent.CurrentPlayer.ATK / Parent.OtherPlayer.DEF) resultTypeList.Add(w);
             }
         }
         if (resultTypeList.Count == 0) return false;
-        foreach(var i in resultTypeList)
+        foreach (var i in resultTypeList)
         {
             if (TryWordSearchByType(startChar, i.Type1, i.Type2, out var wordTemp))
                 resultList.Add(wordTemp);
         }
-        if(resultList.Count > 0)
+        if (resultList.Count > 0)
         {
             word = resultList[new Random().Next(resultList.Count)];
             return true;
@@ -212,7 +235,7 @@ internal abstract class CPUPlayer : Player
     /// 単語探索時に参照する最初の文字を取得します。
     /// </summary>
     /// <returns>最初の文字</returns>
-    public char GetStartChar()
+    private char GetStartChar()
     {
         return Parent is null ? GetRandomChar()
              : string.IsNullOrWhiteSpace(Parent.OtherPlayer.CurrentWord.Name) ? GetRandomChar()
@@ -238,12 +261,11 @@ internal class Itamae : CPUPlayer
     public override List<string> ReferedName => new() { "いたまえ", "s3", "S3" };
     public override Order Execute(params int[] args)
     {
-        var startchar = GetStartChar();
-        if (TryWordSearchByType(startchar, WordType.Food, out var wordFood))
+        if (TryWordSearchByType(StartChar, WordType.Food, out var wordFood))
         {
             return new(wordFood.Name);
         }
-        return new(FindSomeWord(startchar).Name);
+        return new(FindSomeWord(StartChar).Name);
     }
 }
 /// <summary>
@@ -260,22 +282,37 @@ internal class Tsuyoshi : CPUPlayer
     public Tsuyoshi() : base() { }
     public override Order Execute(params int[] args)
     {
-        var startchar = GetStartChar();
-        if (ViolenceUsed < 2 && TryWordSearchByType(startchar, WordType.Violence, out var wordViolence))
+        if (ViolenceUsed < 2 && TryWordSearchByType(StartChar, WordType.Violence, out var wordViolence))
         {
             ViolenceUsed++;
             return new(wordViolence.Name);
         }
-        if (ViolenceUsed >= 2 && !PlayUsed && TryWordSearchByType(startchar, WordType.Play, out var wordPlay))
+        if (ViolenceUsed >= 2 && !PlayUsed && TryWordSearchByType(StartChar, WordType.Play, out var wordPlay))
         {
             PlayUsed = true;
             return new(wordPlay.Name);
         }
-        if (ViolenceUsed >= 2 && PlayUsed && TryWordSearchByType(startchar, WordType.Violence, out var wordViolenceAttacker))
+        if (ViolenceUsed >= 2 && PlayUsed && TryWordSearchByType(StartChar, WordType.Violence, out var wordViolenceAttacker))
         {
             return new(wordViolenceAttacker.Name);
         }
-        return new(FindSomeWord(startchar).Name);
+        return new(FindSomeWord(StartChar).Name);
+    }
+}
+/// <summary>
+/// あにのAIです。
+/// </summary>
+internal class Ani : CPUPlayer
+{
+    public override Ability FirstAbility => new Oremoji();
+    public override string CPUName { get; set; } = "あに";
+    public override List<string> ReferedName => new() { "あに", "s13", "S13", "sd", "SD" };
+    public Ani(string name, Ability ability) : base(name, ability) { }
+    public Ani() : base() { }
+    public override Order Execute(params int[] args)
+    {
+        for (var i = 30; i > 0; i--) if (TrySearchTypedWord(x => x[0] == StartChar && x.Length >= i, out var word)) return new(word.Name);
+        return new(FindSomeWord(StartChar).Name);
     }
 }
 /// <summary>
@@ -292,36 +329,35 @@ internal class NuzemeAI : CPUPlayer
     public override Order Execute(params int[] args)
     {
         if (Parent is null) return new();
-        var startchar = GetStartChar();
         var word = GetLastWord();
-        if(TrySearchKillWord(startchar, Parent.OtherPlayer.CurrentWord, out var killWord))
+        if (TrySearchKillWord(StartChar, Parent.OtherPlayer.CurrentWord, out var killWord))
         {
             return new(killWord.Name);
         }
-        if (TryWordSearchByName(x => x.Length > 6 && x[0] == startchar && x[^1] == 'ぬ', out var wordNuzeme7))
+        if (TryWordSearchByName(x => x.Length > 6 && x[0] == StartChar && x[^1] == 'ぬ', out var wordNuzeme7))
         {
             return new(wordNuzeme7.Name);
         }
-        if(TryWordSearchByName(x => x.Length == 6 && x[0] == startchar && x[^1] == 'ぬ', out var wordNuzeme6))
+        if (TryWordSearchByName(x => x.Length == 6 && x[0] == StartChar && x[^1] == 'ぬ', out var wordNuzeme6))
         {
             return new(wordNuzeme6.Name);
         }
-        if (TryWordSearchByName(x => x.Length > 0 && x[0] == startchar && x[^1] == 'ぬ', out var wordNuzeme))
+        if (TryWordSearchByName(x => x.Length > 0 && x[0] == StartChar && x[^1] == 'ぬ', out var wordNuzeme))
         {
             return new(wordNuzeme.Name);
         }
-        if (TryWordSearchByName(x => x.Length > 6 && x[0] == startchar && x[^1] == 'ぐ', out var wordGuzeme7))
+        if (TryWordSearchByName(x => x.Length > 6 && x[0] == StartChar && x[^1] == 'ぐ', out var wordGuzeme7))
         {
             return new(wordGuzeme7.Name);
         }
-        if (TryWordSearchByName(x => x.Length == 6 && x[0] == startchar && x[^1] == 'ぐ', out var wordGuzeme6))
+        if (TryWordSearchByName(x => x.Length == 6 && x[0] == StartChar && x[^1] == 'ぐ', out var wordGuzeme6))
         {
             return new(wordGuzeme6.Name);
         }
-        if (TryWordSearchByName(x => x.Length > 0 && x[0] == startchar && x[^1] == 'ぐ', out var wordGuzeme))
+        if (TryWordSearchByName(x => x.Length > 0 && x[0] == StartChar && x[^1] == 'ぐ', out var wordGuzeme))
         {
             return new(wordGuzeme.Name);
         }
-        return new(FindSomeWord(startchar).Name);
+        return new(FindSomeWord(StartChar).Name);
     }
 }

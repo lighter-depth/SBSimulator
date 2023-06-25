@@ -14,6 +14,7 @@ public enum OrderType
     PlayerStringOption,
     ModeOption,
     Show,
+    AI,
     Reset,
     Exit,
     Help,
@@ -161,6 +162,7 @@ public class Order
             if (value.Length < 2) return new(OrderType.Error) { ErrorMessage = "パラメーターが指定されていません" };
             return new(OrderType.Show, value[1].ToLower());
         }
+        if (key is "ai") return ParseAIOrder(value, parent);
         if (key is "reset" or "rs") return new(OrderType.Reset);
         if (key is "exit" or "ex") return new(OrderType.Exit);
         if (key is "help") return new(OrderType.Help);
@@ -175,6 +177,11 @@ public class Order
             return new(OrderType.Remove, value[1]);
         }
         if (key is "__search") return new(OrderType.Search);
+        if (key is "action" or "ac")
+        {
+            if (value.Length < 2) return new(OrderType.Error) { ErrorMessage = "パラメーターが指定されていません" };
+            return ParseActionOrder(value[1..]);
+        }
         if (!string.IsNullOrWhiteSpace(key)) return ParseActionOrder(value);
         return new();
     }
@@ -236,6 +243,23 @@ public class Order
         if (new[] { Options.SetMode }.Contains(option))
         { 
             return new(option, value[2]); 
+        }
+        return defaultError;
+    }
+    private static Order ParseAIOrder(string[] value, Battle parent)
+    {
+        if (value.Length is not (2 or 3)) return new(OrderType.Error) { ErrorMessage = "パラメーターが指定されていません" };
+        if (value.Length is 2)
+        {
+            var body = value[1];
+            var selector = GetSelector(parent);
+            return new(OrderType.AI, body, selector);
+        }
+        if (value.Length is 3)
+        {
+            var body = value[2];
+            var selector = GetSelector(parent, value[1]);
+            return new(OrderType.AI, body, selector);
         }
         return defaultError;
     }

@@ -1,5 +1,6 @@
 ﻿using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
+using System.Numerics;
 using System.Text.RegularExpressions;
 using Umayadia.Kana;
 using static SBSimulator.Word;
@@ -162,6 +163,7 @@ public class Battle
             [OrderType.PlayerStringOption] = OnPlayerStringOptionOrdered,
             [OrderType.ModeOption] = OnModeOptionOrdered,
             [OrderType.Show] = OnShowOrdered,
+            [OrderType.AI] = OnAIOrdered,
             [OrderType.Reset] = OnResetOrdered,
             [OrderType.Exit] = OnExitOrdered,
             [OrderType.Help] = OnHelpOrdered,
@@ -258,25 +260,30 @@ public class Battle
             Buffer.Add("設定「変更可能な特性」がオフになっています。option コマンドから設定を切り替えてください。", Notice.Warn);
             return;
         }
-        var abilChangingPlayer = order.Selector is PlayerSelector.Player1 ? Player1 : Player2;
-        var nextAbil = AbilityFactory.Create(order.Body, IsCustomAbilUsable);
+        var player = PlayerSelectorToPlayerOrDefault(order.Selector);
+        if (player is null)
+        {
+            Buffer.Add("条件に一致するプレイヤーが見つかりませんでした。", Notice.Warn);
+            return;
+        }
+        var nextAbil = AbilityManager.Create(order.Body, IsCustomAbilUsable);
         if (nextAbil is null)
         {
             Buffer.Add($"入力 {order.Body} に対応するとくせいが見つかりませんでした。", Notice.Warn);
             return;
         }
-        if (nextAbil == abilChangingPlayer.Ability)
+        if (nextAbil == player.Ability)
         {
             Buffer.Add("既にそのとくせいになっている！", Notice.Warn);
             return;
         }
-        if (abilChangingPlayer.TryChangeAbil(nextAbil))
+        if (player.TryChangeAbil(nextAbil))
         {
-            Buffer.Add($"{abilChangingPlayer.Name} はとくせいを {nextAbil.ToString()} に変更しました", Notice.SystemInfo);
+            Buffer.Add($"{player.Name} はとくせいを {nextAbil.ToString()} に変更しました", Notice.SystemInfo);
             if (nextAbil.InitMessage is not null) Buffer.Add(nextAbil.InitMessage);
         }
         else
-            Buffer.Add($"{abilChangingPlayer.Name} はもう特性を変えられない！", Notice.Caution);
+            Buffer.Add($"{player.Name} はもう特性を変えられない！", Notice.Caution);
 
     }
     public void OnEnablerOptionOrdered(Order order, CancellationTokenSource cts)
@@ -384,12 +391,7 @@ public class Battle
     }
     private void OnPlayerNumOptionOrdered(Order order, CancellationTokenSource cts)
     {
-        var player = order.Selector switch
-        {
-            PlayerSelector.Player1 => Player1,
-            PlayerSelector.Player2 => Player2,
-            _ => null
-        };
+        var player = PlayerSelectorToPlayerOrDefault(order.Selector);
         if (player is null)
         {
             Buffer.Add("条件に一致するプレイヤーが見つかりませんでした。", Notice.Warn);
@@ -411,13 +413,8 @@ public class Battle
     }
     private void OnPlayerStringOptionOrdered(Order order, CancellationTokenSource cts) 
     {
-        var player = order.Selector switch
-        {
-            PlayerSelector.Player1 => Player1,
-            PlayerSelector.Player2 => Player2,
-            _ => null
-        };
-        if(player is null)
+        var player = PlayerSelectorToPlayerOrDefault(order.Selector);
+        if (player is null)
         {
             Buffer.Add("条件に一致するプレイヤーが見つかりませんでした。", Notice.Warn); 
             return;
@@ -453,6 +450,10 @@ public class Battle
             Buffer.Add($"モードを {modeName} に設定しました。", Notice.SettingInfo);
             return;
         }
+    }
+    private void OnAIOrdered(Order order, CancellationTokenSource cts)
+    {
+        Buffer.Add("「AIの変更」機能は開発中です", Notice.SystemInfo);
     }
 
     /// <summary>
@@ -498,5 +499,14 @@ public class Battle
             Buffer.Add($"{CurrentPlayer.Name} のターンです", Notice.General);
             Buffer.Add($"{Player1.Name}: {Player1.HP}/{Player1.MaxHP},     {Player2.Name}: {Player2.HP}/{Player2.MaxHP}", Notice.LogInfo);
         }
+    }
+    private Player? PlayerSelectorToPlayerOrDefault(PlayerSelector selector)
+    {
+        return selector switch
+        {
+            PlayerSelector.Player1 => Player1,
+            PlayerSelector.Player2 => Player2,
+            _ => null
+        };
     }
 }

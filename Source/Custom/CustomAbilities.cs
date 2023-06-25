@@ -176,3 +176,28 @@ internal class Kakutei : CustomAbility
     }
     public override string ToString() => "かくてい";
 }
+internal class GouyokunaTsubo : CustomAbility, ISingleTypedBufAbility
+{
+    public override AbilityType Type => AbilityType.ActionBegin;
+    public override List<string> CustomName => new() { "pg", "PG", "ごうよくなつぼ", "強欲な壺", "gouyokunatsubo", "GouyokunaTsubo", "GOUYOKUNATSUBO" };
+    public Word.WordType BufType => Word.WordType.Emote; 
+    public override void Execute(Contract c) 
+    {
+        if (c is not BufContract bc) return;
+        if (bc.Actor.CurrentWord.ContainsType(BufType))
+        {
+            bc.Actor._abilChangedCount--;
+        }
+    }
+    public override string ToString() => "ごうよくなつぼ";
+}
+internal class AutoAim : CustomAbility
+{
+    public override AbilityType Type => AbilityType.ContractBegin;
+    public override List<string> CustomName => new() { "aa", "AA", "おーとえいむ", "オートエイム", "autoaim", "AutoAim", "AUTOAIM" };
+    public override void Execute(Contract c)
+    {
+        c.Actor.Luck = Luck.Lucky;
+    }
+    public override string ToString() => "オートエイム";
+}

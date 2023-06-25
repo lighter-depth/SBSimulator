@@ -63,7 +63,7 @@ namespace SBSimulator;
 class Program
 {
     #region static fields
-    static readonly string Version = "v0.5.3";
+    static readonly string Version = "v0.5.4";
     static readonly Window Window = new();
     static Mode Mode = new();
     static Battle Battle = new();
@@ -95,7 +95,7 @@ class Program
             ("\n\n---この画面のスクリーンショットを開発者に送信してください---\n\n開発者のtwitterアカウント: ", Cyan).Write();
             ("https://twitter.com/lighter_depth", DarkGreen).WriteLine();
             Console.WriteLine("\n\n\n\n任意のキーを押してアプリケーションを終了します. . . ");
-            Console.ReadLine();
+            Console.ReadKey();
         }
     }
     static void Initialize()
@@ -163,7 +163,6 @@ class Program
         #region constants
         const string EXIT = "exit";
         const string RESET = "reset";
-        const string ACTION = "action";
         const string CHANGE = "change";
         const string OPTION = "option";
         const string ENABLE = "enable";
@@ -192,7 +191,7 @@ class Program
              + "・ヘルプの終了           → q キーを入力\n"
              + "・アプリケーションの終了 → r キーを入力", Yellow).WriteLine();
 
-            var helpOrder = Console.ReadLine() ?? string.Empty;
+            var helpOrder = Console.ReadKey().KeyChar.ToString() ?? string.Empty;
             Console.Clear();
             switch (helpOrder)
             {
@@ -201,14 +200,14 @@ class Program
                         ("・コマンドの入力について\n\n"
                          + "アプリケーション中では、コマンドを用いて操作を行います。\n"
                          + "具体的には以下のようなコマンドがあります。\n\n", Yellow).WriteLine();
-                        ($"・{ACTION} コマンド       ・{SHOW}   コマンド       ・{RESET}  コマンド\n"
+                        ($"・単語 コマンド       ・{SHOW}   コマンド       ・{RESET}  コマンド\n"
                          + $"・{HELP}   コマンド       ・{CHANGE} コマンド       ・{EXIT}   コマンド\n"
                          + $"・{OPTION} コマンド\n", Cyan).WriteLine();
                         ("...続けるには任意のキーを押してください...", White).WriteLine();
-                        Console.ReadLine();
+                        Console.ReadKey();
                         Console.Clear();
-                        ($"・{ACTION} コマンドの使い方\n", Yellow).WriteLine();
-                        ($"コマンド名を一切指定せずに実行すると、{ACTION} コマンドとして実行されます。\n\n{ACTION} コマンドは、ゲーム内で何か行動をするときに使用します。\n\n"
+                        ($"・単語 コマンドの使い方\n", Yellow).WriteLine();
+                        ($"コマンド名を一切指定せずに実行すると、単語 コマンドとして実行されます。\n\n単語 コマンドは、ゲーム内で何か行動をするときに使用します。\n\n"
                                         + "使い方は以下の通りです。\n", Yellow).WriteLine();
                         ($"[単語名] [単語のタイプ指定]\n", Green).WriteLine();
                         ($"(例): しっぺ JV     →   しっぺ(遊び / 暴力) で相手に攻撃する\n"
@@ -217,14 +216,14 @@ class Program
                         ($"また、{nameof(Options.Infer)} オプションが有効な場合には、一部タイプ名の省略が可能です。\n", Yellow).WriteLine();
                         ($"(例): るいざ   →    るいざ CK\n", Cyan).WriteLine();
                         ($"・ワイルドカード\n", Yellow).WriteLine();
-                        ($"{ACTION} コマンド中の「単語名」パラメーター中に、アスタリスク記号 (\"", Yellow).Write();
+                        ($"単語 コマンド中の「単語名」パラメーター中に、アスタリスク記号 (\"", Yellow).Write();
                         (" * ", Green).Write();
                         ($"\") を含めることで、\n{nameof(Options.Infer)} オプションや{nameof(Options.Strict)} オプションによる制限を軽減することができます。\n", Yellow).WriteLine();
                         ("(例): あ*****ぞ D  →   「あ」で始まり「ぞ」で終わる、7文字の虫タイプの単語", Cyan).WriteLine();
                         ("　    お***** JG   →   「お」で始まり6文字の、遊び・地名複合タイプの単語", Cyan).WriteLine();
                         ("　    * F          →    任意の文字を受け付け、任意の文字に使用できる、1文字の食べ物タイプの単語\n", Cyan).WriteLine();
                         ("...続けるには任意のキーを押してください...", White).WriteLine();
-                        Console.ReadLine();
+                        Console.ReadKey();
                         Console.Clear();
                         ($"・{CHANGE} コマンドの使い方\n\n"
                          + $"バトル中にとくせいを変更する場合には、{CHANGE} コマンドを使います。\n"
@@ -239,7 +238,7 @@ class Program
                          + "変更するプレイヤーを明示しない場合は、現在ターンが回ってきているプレイヤーを参照します。\n\n"
                          + "とくせいの表記の仕方については [ヘルプ] > [とくせいの入力法] もご参照ください。\n", Yellow).WriteLine();
                         ("...続けるには任意のキーを押してください...", White).WriteLine();
-                        Console.ReadLine();
+                        Console.ReadKey();
                         Console.Clear();
                         ("・その他のコマンドの使い方\n\n" + "他に、以下のようなコマンドが使用可能です。\n", Yellow).WriteLine();
                         ($"・{OPTION} コマンド\n\n  オプションを指定します。\n  詳しくは [ヘルプ] > [オプションの一覧] をご参照ください。\n", Yellow).WriteLine();
@@ -249,7 +248,7 @@ class Program
                         ($"・{EXIT} コマンド\n\n  アプリケーションを終了します。\n", Yellow).WriteLine();
                         ($"(例): {EXIT}\n", Cyan).WriteLine();
                         ("...続けるには任意のキーを押してください...", White).WriteLine();
-                        Console.ReadLine();
+                        Console.ReadKey();
                         Console.Clear();
                         ($"・{HELP} コマンド\n\n  ヘルプを表示します。\n", Yellow).WriteLine();
                         ($"(例): {HELP}\n", Cyan).WriteLine();
@@ -259,7 +258,7 @@ class Program
                          + $"      {SHOW} {LOG}       →   ログを表示する。\n"
                          + $"      {SHOW} {INFO}      →   アプリの情報を表示する。\n", Cyan).WriteLine();
                         ("...続けるには任意のキーを押してください...", White).WriteLine();
-                        Console.ReadLine();
+                        Console.ReadKey();
 
                         break;
                     }
@@ -279,7 +278,7 @@ class Program
                             + "      いっこういっき SV → いっこういっき (社会 / 暴力) の意味\n", Cyan).WriteLine();
                         ($"タイプを何も指定せずに入力すると、{nameof(Options.Infer)} オプションが有効な場合にはその単語から推論されるタイプが、\nそうでない場合には「無属性」が設定されます。\n", Yellow).WriteLine();
                         ("...続けるには任意のキーを押してください...", White).WriteLine();
-                        Console.ReadLine();
+                        Console.ReadKey();
                         break;
                     }
                 case "a":
@@ -293,7 +292,7 @@ class Program
                         ($"(例): {CHANGE} N → {CHANGE} デバッガー と同じ意味\n"
                        + $"      {CHANGE} E → {CHANGE} じょうねつ と同じ意味\n", Cyan).WriteLine();
                         ("...続けるには任意のキーを押してください...", White).WriteLine();
-                        Console.ReadLine();
+                        Console.ReadKey();
                         Console.Clear();
                         ("・独自の略記\n\n" + "とくせい指定用の独自の略記を用いることもできます。\n" + "詳細は以下の通りです。\n\n", Yellow).WriteLine();
                         ("デバッガー       → deb    はんしょく     → brd    やどりぎ     → sed    グローバル     → gbl\n"
@@ -305,7 +304,7 @@ class Program
                        + "俺文字           → orm\n\n", Cyan).WriteLine();
                         ("また、上記以外にも使用可能な表記が存在する場合があります。(例: 「出歯」「ロクロ」「WZ」など)\n\n", Yellow).WriteLine();
                         ("...続けるには任意のキーを押してください...", White).WriteLine();
-                        Console.ReadLine();
+                        Console.ReadKey();
                         break;
                     }
                 case "o":
@@ -323,7 +322,7 @@ class Program
                        + $"  パラメーター \"{ENABLE}\" を選択すると有効に、\"{DISABLE}\" を選択すると無効になります。\n", Yellow).WriteLine();
                         ($"(例): {OPTION} {nameof(Options.InfiniteCure)} {DISABLE}   → 医療タイプの単語で回復可能な回数を有限(デフォルトでは５回)に設定する\n", Cyan).WriteLine();
                         ("...続けるには任意のキーを押してください...", White).WriteLine();
-                        Console.ReadLine();
+                        Console.ReadKey();
                         Console.Clear();
                         ($"・{nameof(Options.AbilChange)} オプション\n  とくせいが変更可能かどうかを設定します。\n"
                        + $"  パラメーター \"{ENABLE}\" を選択すると有効に、\"{DISABLE}\" を選択すると無効になります。\n", Yellow).WriteLine();
@@ -335,7 +334,7 @@ class Program
                         ($"・{nameof(Options.SetMaxFoodCount)} オプション\n  食べ物タイプの単語で回復可能な回数を設定します。\n", Yellow).WriteLine();
                         ($"(例): {OPTION} {nameof(Options.SetMaxFoodCount)} 6   → 食べ物タイプの単語で回復可能な回数を６回に設定する\n", Cyan).WriteLine();
                         ("...続けるには任意のキーを押してください...", White).WriteLine();
-                        Console.ReadLine();
+                        Console.ReadKey();
                         Console.Clear();
                         ($"・{nameof(Options.SetSeedDmg)} オプション\n  やどりぎによるダメージを設定します。\n", Yellow).WriteLine();
                         ($"(例): {OPTION} {nameof(Options.SetSeedDmg)} 5   → やどりぎのダメージを５に設定する\n", Cyan).WriteLine();
@@ -346,7 +345,7 @@ class Program
                         ($"・{nameof(Options.SetInsBufQty)} オプション\n  ほけん発動によって何段階攻撃力が変化するかを設定します。\n", Yellow).WriteLine();
                         ($"(例): {OPTION} {nameof(Options.SetInsBufQty)} 4   → ほけん発動による攻撃力の変化をを４段階に設定する\n", Cyan).WriteLine();
                         ("...続けるには任意のキーを押してください...", White).WriteLine();
-                        Console.ReadLine();
+                        Console.ReadKey();
                         Console.Clear();
                         ($"・{nameof(Options.Strict)} オプション\n  有効にすると、厳密なしりとりのルールが適用されます。\n"
                         + "  具体的には、以下の機能が有効になります。\n\n" + "・開始文字がマッチしない単語の禁止\n\n"
@@ -359,7 +358,7 @@ class Program
                         + $"  パラメーター \"{ENABLE}\" を選択すると有効に、\"disable\" を選択すると無効になります。\n", Yellow).WriteLine();
                         ($"(例): {OPTION} {nameof(Options.Infer)} {ENABLE}   → タイプの推論を有効にする\n", Cyan).WriteLine();
                         ("...続けるには任意のキーを押してください...", White).WriteLine();
-                        Console.ReadLine();
+                        Console.ReadKey();
                         Console.Clear();
                         ($"・{nameof(Options.SetMode)} オプション\n  複数のオプションをまとめて変更します。\n"
                         + "  パラメーターにはモード名を指定できます。\n", Yellow).WriteLine();
@@ -372,7 +371,7 @@ class Program
                         ($"(例): {OPTION} {nameof(Options.SetLuck)} じぶん lucky   → 「じぶん」という名前のプレイヤーの運をを 「Lucky」 に設定する\n", Cyan).WriteLine();
                         ("設定可能なモードの一覧については、[ヘルプ] > [モードの設定方法] もご参照ください。\n", Yellow).WriteLine();
                         ("...続けるには任意のキーを押してください...", White).WriteLine();
-                        Console.ReadLine();
+                        Console.ReadKey();
                         Console.Clear();
                         ($"・{nameof(Options.CustomAbil)} オプション\n  有効にすると、カスタム特性が使用可能になります。\n"
                        + $"  パラメーター \"{ENABLE}\" を選択すると有効に、\"{DISABLE}\" を選択すると無効になります。\n", Yellow).WriteLine();
@@ -381,7 +380,7 @@ class Program
                         + $"  パラメーター \"{ENABLE}\" を選択すると有効に、\"{DISABLE}\" を選択すると無効になります。\n", Yellow).WriteLine();
                         ($"(例): {OPTION} {nameof(Options.CPUDelay)} {ENABLE}   → CPUの待ち時間を有効にする\n", Cyan).WriteLine();
                         ("...続けるには任意のキーを押してください...", White).WriteLine();
-                        Console.ReadLine();
+                        Console.ReadKey();
                         break;
                     }
                 case "k":
@@ -399,14 +398,14 @@ class Program
                        + $"Default: d   Classic; c   AgeOfSeed: s\n\n"
                        + $"{STATUS}: s     {OPTIONS}: o    {LOG}: l    {INFO}: i\n\n\n  ", Cyan).WriteLine();
                         ("...続けるには任意のキーを押してください...", White).WriteLine();
-                        Console.ReadLine();
+                        Console.ReadKey();
                         break;
                     }
                 case "m":
                     {
                         ("・モードの設定方法について\n", Yellow).WriteLine();
                         ("モードとは、最大体力や医療制限の設定、先手後手の設定、やどりぎの設定など、\n"
-                      +  "複数のオプションを一括して管理する仕組みを表します。\n\n"
+                      + "複数のオプションを一括して管理する仕組みを表します。\n\n"
                       + $"モードの設定・変更は、起動直後のモード設定、及び {OPTION} コマンドの {nameof(Options.SetMode)} パラメーターを\n"
                       + "使用することで行うことができます。\n\n"
                       + "設定可能なモードは以下の通りです。\n", Yellow).WriteLine();
@@ -420,7 +419,7 @@ class Program
                         ($"・AgeOfSeed モード\n  やどりぎ環境のモード。体力上限６０、とくせい変更３回、医療５回、やどりぎ無限。", Yellow).WriteLine();
                         ("  参照名: \"AgeOfSeed\", \"s\" など\n", Yellow).WriteLine();
                         ("...続けるには任意のキーを押してください...", White).WriteLine();
-                        Console.ReadLine();
+                        Console.ReadKey();
                         Console.Clear();
                         ("・ストーリー モード\n", Yellow).WriteLine();
                         ("ストーリーに登場するステージの環境を再現したモードです。", Yellow).WriteLine();
@@ -434,7 +433,7 @@ class Program
                         ($"Default モードと同じステージ条件で、どちらのプレイヤーが先攻するかを\n指定することができます。\n", Yellow).WriteLine();
                         ("参照名: \"p1\"(プレイヤー１が先攻する場合), \"p2\"(プレイヤー２が先攻する場合)\n\n", Yellow).WriteLine();
                         ("...続けるには任意のキーを押してください...", White).WriteLine();
-                        Console.ReadLine();
+                        Console.ReadKey();
                         break;
                     }
                 case "q":
@@ -447,7 +446,7 @@ class Program
         }
     loopend:;
         ("ヘルプを終了します。任意のキーを押してください。", Yellow).WriteLine();
-        Console.ReadLine();
+        Console.ReadKey();
         Console.Clear();
     }
     #endregion
@@ -637,7 +636,7 @@ class Program
         if (isP1Human)
         {
             ("プレイヤーの初期特性を入力してください。(デフォルトではデバッガーになります)", Yellow).WriteLine();
-            p1Abil = AbilityFactory.Create(Console.ReadLine() ?? "N", true) ?? new Debugger();
+            p1Abil = AbilityManager.Create(Console.ReadLine() ?? "N", true) ?? new Debugger();
             ($"{p1Name} の初期特性を {p1Abil.ToString()} に設定しました。", Green).WriteLine();
         }
         else
@@ -648,7 +647,7 @@ class Program
         if (isP2Human)
         {
             ("相手の初期特性を入力してください。(デフォルトではデバッガーになります)", Yellow).WriteLine();
-            p2Abil = AbilityFactory.Create(Console.ReadLine() ?? "N", true) ?? new Debugger();
+            p2Abil = AbilityManager.Create(Console.ReadLine() ?? "N", true) ?? new Debugger();
             ($"{p2Name} の初期特性を {p2Abil.ToString()} に設定しました。", Green).WriteLine();
         }
         else
@@ -657,7 +656,7 @@ class Program
             p2Abil = p2CPU.Ability;
         }
         ("続けるには任意のキーを入力してください. . . ", White).WriteLine();
-        Console.ReadLine();
+        Console.ReadKey();
         Console.Clear();
         ("以下の設定で開始します。", Yellow).WriteLine();
         Console.WriteLine();
@@ -667,7 +666,7 @@ class Program
         ($"相手の名前: {p2NameResult}, 相手の初期特性: {p2Abil.ToString()}", Cyan).WriteLine();
         Console.WriteLine();
         ("開始するには任意のキーを入力してください. . . ", Yellow).WriteLine();
-        Console.ReadLine();
+        Console.ReadKey();
         p1 = isP1Human ? new Player(p1Name, p1Abil) : p1CPU;
         p2 = isP2Human ? new Player(p2Name, p2Abil) : p2CPU;
         Console.Clear();
@@ -703,7 +702,7 @@ class Program
         Ability? p1Abil, p2Abil;
         CPUPlayer? p2CPU;
         ("プレイヤーの初期特性を入力してください。(デフォルトではデバッガーになります)", Yellow).WriteLine();
-        p1Abil = AbilityFactory.Create(Console.ReadLine() ?? "N", true) ?? new Debugger();
+        p1Abil = AbilityManager.Create(Console.ReadLine() ?? "N", true) ?? new Debugger();
         ($"{p1Name} の初期特性を {p1Abil.ToString()} に設定しました。", Green).WriteLine();
         p2CPU = CPUFactory.Create(p2Name) ?? new Tsuyoshi(p2Name, new Kakumei());
         p2Abil = p2CPU.FirstAbility;
@@ -713,7 +712,7 @@ class Program
         ($"相手の名前: {p2Name}, 相手の初期特性: {p2Abil.ToString()}", Cyan).WriteLine();
         Console.WriteLine();
         ("開始するには任意のキーを入力してください. . . ", Yellow).WriteLine();
-        Console.ReadLine();
+        Console.ReadKey();
         p1 = new Player(p1Name, p1Abil);
         p2 = p2CPU;
         Console.Clear();
@@ -813,7 +812,7 @@ class Program
         if (isP1Human)
         {
             ("プレイヤーの初期特性を入力してください。(デフォルトではデバッガーになります)", Yellow).WriteLine();
-            p1Abil = AbilityFactory.Create(Console.ReadLine() ?? "N", true) ?? new Debugger();
+            p1Abil = AbilityManager.Create(Console.ReadLine() ?? "N", true) ?? new Debugger();
             ($"{p1Name} の初期特性を {p1Abil.ToString()} に設定しました。", Green).WriteLine();
         }
         else
@@ -824,7 +823,7 @@ class Program
         if (isP2Human)
         {
             ("相手の初期特性を入力してください。(デフォルトではデバッガーになります)", Yellow).WriteLine();
-            p2Abil = AbilityFactory.Create(Console.ReadLine() ?? "N", true) ?? new Debugger();
+            p2Abil = AbilityManager.Create(Console.ReadLine() ?? "N", true) ?? new Debugger();
             ($"{p2Name} の初期特性を {p2Abil.ToString()} に設定しました。", Green).WriteLine();
         }
         else
@@ -833,7 +832,7 @@ class Program
             p2Abil = p2CPU.Ability;
         }
         ("続けるには任意のキーを入力してください. . . ", White).WriteLine();
-        Console.ReadLine();
+        Console.ReadKey();
         Console.Clear();
         TurnProceedingArbiter p1TPA, p2TPA;
         ("プレイヤーが先攻するかどうかを決定してください。(先攻 → t キー、後攻 → f キー、ランダム → r キーを入力)", Yellow).WriteLine();
@@ -866,7 +865,7 @@ class Program
         var isAbilChangeable = Console.ReadLine() is "e";
         ("「変更可能な特性」設定を" + (isAbilChangeable ? "有効" : "無効") + "に設定しました。", Green).WriteLine();
         ("続けるには任意のキーを入力してください. . . ", White).WriteLine();
-        Console.ReadLine();
+        Console.ReadKey();
         Console.Clear();
         ("この設定でよろしいですか？", Yellow).WriteLine();
         Console.WriteLine();
@@ -878,7 +877,7 @@ class Program
         ("医療の使用回数無限: " + (isCureInfinite ? "有効" : "無効"), Cyan).WriteLine();
         ("変更可能な特性: " + (isAbilChangeable ? "有効" : "無効\n\n"), Cyan).WriteLine();
         ("続けるには任意のキーを入力してください. . . ", White).WriteLine();
-        Console.ReadLine();
+        Console.ReadKey();
         Console.Clear();
         Console.WriteLine();
         ("OK！ → 任意のキーを入力", Yellow).WriteLine();
@@ -976,7 +975,7 @@ class Program
         Console.Clear();
         ("\n" + Battle.Player1.GetStatusString() + Battle.Player2.GetStatusString() + $"\n現在のターン: {Battle.CurrentPlayer.Name}\n経過したターン数: {Battle.TurnNum}\n\n\n\n", Yellow).WriteLine();
         ("終了するには、任意のキーを押してください. . . ", White).WriteLine();
-        Console.ReadLine();
+        Console.ReadKey();
         Console.Clear();
     }
     /// <summary>
@@ -998,7 +997,7 @@ class Program
          + $"ChangeableAbility:         {Battle.IsAbilChangeable}\n\n"
          + $"ChangeableAbilityCount:    {Player.MaxAbilChange}回\n\n", Yellow).WriteLine();
         ("終了するには、任意のキーを押してください. . . ", White).WriteLine();
-        Console.ReadLine();
+        Console.ReadKey();
         Console.Clear();
     }
     /// <summary>
@@ -1016,7 +1015,7 @@ class Program
         ("・ゲーム「しりとりバトル」のURL: http://siritori-battle.net/\n\n"
          + "・「しりとりバトル」の制作者、ささみJP氏のTwitterアカウント: https://twitter.com/sasamijp\n\n\n", DarkYellow).WriteLine();
         ("終了するには、任意のキーを押してください. . . ", White).WriteLine();
-        Console.ReadLine();
+        Console.ReadKey();
         Console.Clear();
     }
     /// <summary>
@@ -1057,7 +1056,7 @@ class Program
                     Window.Message.Log.Clear();
                     Console.Clear();
                     Console.WriteLine("ログを消去しました。任意のキーを押してください. . .");
-                    Console.ReadLine();
+                    Console.ReadKey();
                     break;
                 }
                 else if (order == "n" && index < logList.Count - 1)
@@ -1090,7 +1089,7 @@ class Program
                     Window.Message.Log.Clear();
                     Console.Clear();
                     Console.WriteLine("ログを消去しました。任意のキーを押してください. . .");
-                    Console.ReadLine();
+                    Console.ReadKey();
                     break;
                 }
             }
@@ -1104,7 +1103,7 @@ class Program
     {
         Console.Clear();
         ("アプリケーションを終了します。任意のキーを押してください. . .", Yellow).WriteLine();
-        Console.ReadLine();
+        Console.ReadKey();
     }
     #endregion
 
@@ -1187,7 +1186,7 @@ class Program
             {
                 Console.Clear();
                 Console.WriteLine("ワードサーチモードを終了します。\n\n任意のキーを押してください. . . ");
-                Console.ReadLine();
+                Console.ReadKey();
                 break;
             }
             if (orderSearchLog[0] == "-m")
@@ -1215,16 +1214,25 @@ class Program
             ("\n検索条件: ", Yellow).Write();
             (string.Join(" ", orderSearchLog), Cyan).WriteLine();
             ("\nマッチする単語を探しています. . . \n", Yellow).WriteLine();
-            if (!TrySearch(cond, searchOption, dicOption, out var words))
+            var searchFlags = TrySearch(cond, searchOption, dicOption, out var words);
+            if (!searchFlags.HasParseSuccessed)
+            {
+                ("単語を検索できませんでした。\n", Red).WriteLine();
+                ("検索文の書式が不正であるか、検索できない文字が含まれています。\n\n", DarkYellow).WriteLine();
+                Console.WriteLine("やり直すには任意のキーを押してください。");
+                Console.ReadKey();
+                continue;
+            }
+            if (!searchFlags.HasFound)
             {
                 ("マッチする単語が見つかりませんでした。\n\n", Red).WriteLine();
                 Console.WriteLine("やり直すには任意のキーを押してください。");
-                Console.ReadLine();
+                Console.ReadKey();
                 continue;
             }
             ($"結果は{words.Count}件見つかりました。\n", Green).WriteLine();
             Console.WriteLine("表示するには任意のキーを押してください. . . ");
-            Console.ReadLine();
+            Console.ReadKey();
             Console.Clear();
             var height = Console.WindowHeight - 10;
             if (words.Count > height)
@@ -1321,7 +1329,7 @@ class Program
        + "・7 オプション  →  b オプションと同様の検索方法で、7文字以上のもののみ出力します。\n"
        + "・6 オプション  →  b オプションと同様の検索方法で、6文字以上のもののみ出力します。\n", Cyan).WriteLine();
         ("続けるには、任意のキーを押してください. . . ", White).WriteLine();
-        Console.ReadLine();
+        Console.ReadKey();
         Console.Clear();
         ("ワードサーチモード\n", White).WriteLine();
         ("・辞書オプション\n", Yellow).WriteLine();
@@ -1332,7 +1340,7 @@ class Program
        + "・x オプション  →  拡張無属性辞書のみ検索します。\n"
        + "・t オプション  →  有属性辞書のみ検索します。\n", Cyan).WriteLine();
         ("続けるには、任意のキーを押してください. . . ", White).WriteLine();
-        Console.ReadLine();
+        Console.ReadKey();
     }
 
     // FIXME: 「ゔ」のサーチがうまくいかない。（「\u3094」でマッチすればうまくいく）
@@ -1344,23 +1352,31 @@ class Program
     /// <param name="dicOption">辞書のオプション</param>
     /// <param name="words">検索条件にマッチする文字列のリスト</param>
     /// <returns>検索が成功したかどうかを表すフラグ</returns>
-    static bool TrySearch(string name, int searchOption, int dicOption, out List<string> words)
+    static (bool HasFound, bool HasParseSuccessed) TrySearch(string name, int searchOption, int dicOption, out List<string> words)
     {
-        bool result = false;
+        var result = (false, true);
         words = new();
-        var r = new Regex(searchOption switch
+        Regex r;
+        try
         {
-            0 => $"^{name}$",
-            1 => name,
-            2 => $"^{name[0]}",
-            3 => $"{name[^1]}ー*$",
-            4 => $@"^{name[0]}.*{name[^1]}ー*$",
-            5 => name,
-            6 => name,
-            7 => $@"^{name[0]}.{{5,}}{name[^1]}$|^{name[0]}.{{4,}}{name[^1]}ー$",
-            8 => $@"^{name[0]}.{{4,}}{name[^1]}$|^{name[0]}.{{3,}}{name[^1]}ー$",
-            _ => name
-        });
+            r = new Regex(searchOption switch
+            {
+                0 => $"^{name}$",
+                1 => name,
+                2 => $"^{name[0]}",
+                3 => $"{name[^1]}ー*$",
+                4 => $@"^{name[0]}.*{name[^1]}ー*$",
+                5 => name,
+                6 => name,
+                7 => $@"^{name[0]}.{{5,}}{name[^1]}$|^{name[0]}.{{4,}}{name[^1]}ー$",
+                8 => $@"^{name[0]}.{{4,}}{name[^1]}$|^{name[0]}.{{3,}}{name[^1]}ー$",
+                _ => name
+            });
+        }
+        catch (RegexParseException)
+        {
+            return (false, false);
+        }
         var dic = dicOption switch
         {
             1 => SBDictionary.NoTypeWords,
@@ -1374,7 +1390,7 @@ class Program
         {
             if (r.IsMatch(i))
             {
-                result = true;
+                result.Item1 = true;
                 words.Add(i);
             }
         }
@@ -1425,4 +1441,5 @@ class Program
     #endregion
 
     #endregion
+
 }
