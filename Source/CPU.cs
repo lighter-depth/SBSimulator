@@ -127,8 +127,16 @@ internal abstract class CPUPlayer : Player
     {
         word = null;
         if (Parent is null) return false;
+
         word = new();
-        var resultWords = SBDictionary.TypedWords.Where(x => x.Key[0] == startChar && x.Value.Contains(type1) && x.Value.Contains(type2) && !Parent.UsedWords.Contains(x.Key)).ToDictionary(p => p.Key, p => p.Value);
+
+        var resultWords = SBDictionary.TypedWords
+            .Where(x => x.Key[0] == startChar 
+                && x.Value.Contains(type1) 
+                && x.Value.Contains(type2) 
+                && !Parent.UsedWords.Contains(x.Key))
+            .ToDictionary(p => p.Key, p => p.Value);
+
         var random = new Random().Next(resultWords.Count);
         if (resultWords.Count != 0 && Parent.TryInferWordTypes(resultWords.ElementAt(random).Key, out var wordTemp))
         {
@@ -180,9 +188,16 @@ internal abstract class CPUPlayer : Player
     public bool TrySearchKillWord(char startChar, Word prev, [NotNullWhen(true)] out Word? word)
     {
         word = null;
+        // 条件にあう複合タイプのリスト
+        // Word クラスのインスタンスとして保存(悪手)
         var resultTypeList = new List<Word>();
+
+        // 最終的に出力される単語を集めたリスト
         var resultList = new List<Word>();
+
         if (Parent is null) return false;
+
+        // 総当たりで即死可能な複合タイプを探す
         for (var i = 0; i < NUMBER_OF_TYPES; i++)
         {
             for (var j = 0; j < NUMBER_OF_TYPES; j++)
@@ -192,11 +207,15 @@ internal abstract class CPUPlayer : Player
             }
         }
         if (resultTypeList.Count == 0) return false;
+
+        // 複合タイプの条件を満たす単語を探す
         foreach (var i in resultTypeList)
         {
             if (TryWordSearchByType(startChar, i.Type1, i.Type2, out var wordTemp))
                 resultList.Add(wordTemp);
         }
+
+        // すべての条件をクリアした単語からランダムで一つピックアップ
         if (resultList.Count > 0)
         {
             word = resultList[new Random().Next(resultList.Count)];

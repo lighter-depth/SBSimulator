@@ -63,13 +63,12 @@ namespace SBSimulator;
 class Program
 {
     #region static fields
-    static readonly string Version = "v0.5.4";
+    static readonly string Version = "v0.5.6";
     static readonly Window Window = new();
     static Mode Mode = new();
     static Battle Battle = new();
     static readonly string DicDir = GetDicPath();
-    static readonly string NoTypeWordsPath = DicDir + @"\no type\no-type-words.csv";
-    static readonly string NoTypeWordExPath = DicDir + @"\no type\no-type-word-extension.csv";
+    static readonly string NoTypeWordsPath = DicDir + @"\no type";
     static readonly string TypedWordsPath = DicDir + @"\typed";
     static readonly Task DictionaryImportTask;
     #endregion
@@ -496,31 +495,30 @@ class Program
     /// </summary>
     static async Task ImportDictionaryAsync()
     {
-        using var noTypeWordsReader = new StreamReader(NoTypeWordsPath);
-        using var exNoTypeWordReader = new StreamReader(NoTypeWordExPath);
-        var files = Directory.GetFiles(TypedWordsPath, "*", SearchOption.AllDirectories);
+        var notypeFiles = Directory.GetFiles(NoTypeWordsPath, "*", SearchOption.AllDirectories);
+        var typedFiles = Directory.GetFiles(TypedWordsPath, "*", SearchOption.AllDirectories);
         SBDictionary.NoTypeWords = new();
-        SBDictionary.NoTypeWordEx = new();
         SBDictionary.TypedWords = new();
-        while (!noTypeWordsReader.EndOfStream)
+        foreach(var file in notypeFiles)
         {
-            var line = await noTypeWordsReader.ReadLineAsync() ?? string.Empty;
-            SBDictionary.NoTypeWords.Add(line);
+            using var noTypeWordsReader = new StreamReader(file);
+            while (!noTypeWordsReader.EndOfStream)
+            {
+                var line = await noTypeWordsReader.ReadLineAsync() ?? string.Empty;
+                SBDictionary.NoTypeWords.Add(line);
+            }
         }
-        while (!exNoTypeWordReader.EndOfStream)
-        {
-            var line = await exNoTypeWordReader.ReadLineAsync() ?? string.Empty;
-            SBDictionary.NoTypeWordEx.Add(line);
-        }
-        foreach (var file in files)
+        foreach (var file in typedFiles)
         {
             using var typedWordsReader = new StreamReader(file);
             while (!typedWordsReader.EndOfStream)
             {
                 var line = await typedWordsReader.ReadLineAsync() ?? string.Empty;
                 var statedLine = line.Trim().Split();
-                if (statedLine.Length == 2) SBDictionary.TypedWords.TryAdd(statedLine[0], new() { statedLine[1].StringToType() });
-                else if (statedLine.Length == 3) SBDictionary.TypedWords.TryAdd(statedLine[0], new() { statedLine[1].StringToType(), statedLine[2].StringToType() });
+                if (statedLine.Length == 2)
+                    SBDictionary.TypedWords.TryAdd(statedLine[0], new() { statedLine[1].StringToType() });
+                else if (statedLine.Length == 3)
+                    SBDictionary.TypedWords.TryAdd(statedLine[0], new() { statedLine[1].StringToType(), statedLine[2].StringToType() });
             }
         }
     }
@@ -1114,6 +1112,8 @@ class Program
     /// </summary>
     static void OnAddOrdered(Order order, CancellationTokenSource cts)
     {
+        Warn("__add コマンドは現在無効です。代わりにタイプ指定子をご利用ください。");
+        /*
         if (order.ErrorMessage is not null)
         {
             Warn(order.ErrorMessage);
@@ -1134,6 +1134,7 @@ class Program
         SBDictionary.NoTypeWordEx.Add(order.Body);
         file.WriteLine(order.Body);
         Window.Message.Append($"単語「{order.Body}」を辞書に追加しました。", Yellow);
+        */
     }
     /// <summary>
     /// 拡張無属性辞書から単語を削除します。
@@ -1142,6 +1143,8 @@ class Program
     /// <param name="cts"></param>
     static void OnRemoveOrdered(Order order, CancellationTokenSource cts)
     {
+        Warn("__remove コマンドは現在無効です。");
+        /*
         if (order.ErrorMessage is not null)
         {
             Warn(order.ErrorMessage);
@@ -1157,6 +1160,7 @@ class Program
         foreach (var i in SBDictionary.NoTypeWordEx)
             file.WriteLine(i);
         Window.Message.Append($"単語「{order.Body}」を辞書から削除しました。", Yellow);
+        */
     }
     /// <summary>
     /// ワードサーチモードを起動します。
@@ -1192,6 +1196,15 @@ class Program
             if (orderSearchLog[0] == "-m")
             {
                 ShowWordSearchManual();
+                continue;
+            }
+            if (orderSearchLog[0] == "-l")
+            {
+                Console.Clear();
+                var clothList = SBDictionary.TypedWords.Where(x => x.Value.Contains(Word.WordType.Cloth)).Select(x => x.Key).ToList();
+                clothList.Sort();
+                foreach (var i in clothList) Console.WriteLine($"{i}, {SBDictionary.TypedWords.GetValueOrDefault(i)?.ElementAtOrDefault(0).TypeToString() ?? string.Empty} {SBDictionary.TypedWords.GetValueOrDefault(i)?.ElementAtOrDefault(1).TypeToString() ?? string.Empty}");
+                Console.ReadLine();
                 continue;
             }
             var cond = orderSearchLog[0];
@@ -1379,10 +1392,9 @@ class Program
         }
         var dic = dicOption switch
         {
-            1 => SBDictionary.NoTypeWords,
-            2 => SBDictionary.NoTypeWordEx,
+            1 or 2 => SBDictionary.NoTypeWords,
             3 => SBDictionary.TypedWords.Keys.ToList(),
-            _ => SBDictionary.NoTypeWords.Concat(SBDictionary.NoTypeWordEx).Concat(SBDictionary.TypedWords.Keys).ToList()
+            _ => SBDictionary.NoTypeWords.Concat(SBDictionary.TypedWords.Keys).ToList()
         };
         if (name[0] == name[^1] && searchOption == 4)
             r = new Regex($"^{name[0]}\\w*{name[^1]}ー*$|^{name[0]}ー*$");

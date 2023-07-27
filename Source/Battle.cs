@@ -476,7 +476,7 @@ public class Battle
             word = new Word(name, CurrentPlayer, OtherPlayer, type1, type2);
             return true;
         }
-        if (SBDictionary.NoTypeWords.Contains(name) || SBDictionary.NoTypeWordEx.Contains(name))
+        if (SBDictionary.NoTypeWords.Contains(name))
         {
             word = new Word(name, CurrentPlayer, OtherPlayer, WordType.Empty);
             return true;
